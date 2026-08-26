@@ -1,0 +1,23 @@
+# Build output
+out/
+*.o
+*.ko
+*.cmd
+*.tmp
+*.bin
+*.dtb
+*.img
+*.zip
+
+# Toolchains
+clang-r*/
+aarch64-linux-gnu-*/
+arm-linux-gnueabi-*/
+
+# Source clones
+kernel/
+chroot/rootfs/rootfs/
+
+# Local-only
+.env
+*.local
