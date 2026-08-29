@@ -50,7 +50,7 @@ if [ "$SHOW_VERSION" -eq 1 ]; then
   echo "  git:     $GIT_HASH"
   echo "  date:    $BUILD_DATE"
   echo "  target:  Redmi Note 12 4G (topaz/tapas)"
-  echo "  kernel:  Linux 5.15.189 (CAF bengal-5.15)"
+  echo "  kernel:  Linux 5.15.211 (CAF bengal-5.15)"
   exit 0
 fi
 
