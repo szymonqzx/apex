@@ -1,0 +1,50 @@
+# APEX SELinux policy — chroot raw-HW domain (Enforcing, no permissive)
+# (BUILD_PLAN.md §6.5)
+# Source .te; compiled on-device via a KernelSU-Next module shipping the
+# policy (KSU module `sepolicy.rule`), or via sepolicy-inject.
+#
+# NOTE: type names (system_app, hal_*_default) are AOSP/LineageOS stock.
+
+type apex_chroot, domain;
+type apex_chroot_exec, exec_type, vendor_file_type, file_type;
+
+# Chroot entry point
+init_daemon_domain(apex_chroot)
+# NOTE: transitions to untrusted_app for shell commands inside the chroot.
+# This is intentional — the chroot runs Linux tools that need app-level
+# access to binder services (sensors, camera, etc). The chroot rootfs
+# is isolated, and the apex_chroot domain limits what binder calls are
+# allowed via the allow rules below.
+domain_auto_trans(apex_chroot, shell_exec, untrusted_app)
+
+# Binder to system_server (am/pm/cmd/dumpsys/settings/getprop)
+allow apex_chroot system_app:fd use;
+allow apex_chroot system_app:binder { call transfer };
+allow apex_chroot servicemanager:binder { call transfer };
+
+# HAL services (sensors, camera, clipboard, notifications, TTS, GPS)
+allow apex_chroot hal_sensors_default:binder { call transfer };
+allow apex_chroot hal_camera_default:binder { call transfer };
+allow apex_chroot hal_clipboard_default:binder { call transfer };
+allow apex_chroot hal_notif_default:binder { call transfer };
+allow apex_chroot hal_tts_default:binder { call transfer };
+allow apex_chroot hal_gnss_default:binder { call transfer };
+
+# Raw hardware nodes
+allow apex_chroot st21nfc_device:chr_file { read write ioctl open };
+allow apex_chroot lirc_device:chr_file { read write ioctl open };
+allow apex_chroot usb_device:chr_file { read write ioctl open };
+allow apex_chroot serial_device:chr_file { read write ioctl open };
+
+# /data/adb/apex (chroot rootfs mount)
+# Grant access only to the apex_rootfs type, NOT the entire system_data_file.
+# The apex_rootfs type is assigned to /data/adb/apex/ via a file_contexts
+# fragment shipped in the KSU module. This prevents the chroot daemon from
+# writing to arbitrary /data paths.
+allow apex_chroot apex_rootfs:dir { add_name search write remove_name read getattr };
+allow apex_chroot apex_rootfs:file { create read write unlink getattr setattr };
+allow apex_chroot apex_rootfs:dir mounton;
+
+# /dev/socket/apex-bridge — the bridge daemon socket
+allow apex_chroot apex_bridge_socket:sock_file { write unlink };
+type apex_bridge_socket, file_type;

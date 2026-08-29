@@ -1,19 +1,26 @@
-# Custom apps
+# apps
 
-Apex Control (Compose, primary) + NFCForge (NFC attack module) + PTK TUI
-(terminal fallback). **No code is written yet.**
+Android applications for the APEX kernel.
 
-## Plan
+## apex-control
 
-| Path | Purpose |
-| :--- | :--- |
-| `apex-control/build.gradle.kts` | Gradle build (Kotlin/Compose) |
-| `apex-control/src/main/AndroidManifest.xml` | Manifest |
-| `apex-control/src/main/kotlin/...` | Sources (will go here) |
-| `nfcforge/` | NFC attack module (sources, MIFARE keys) |
-| `ptk-tui/` | TUI module (Python/curses) |
+A Jetpack Compose app that provides a UI for controlling the apex kernel
+state machine. Communicates with the `apex-bridge` daemon via Unix domain
+socket at `/dev/socket/apex-bridge`.
 
-## Status
+### Features
 
-Empty. Theory only. Apex Control will be the only app visible in the launcher;
-NFCForge and PTK TUI are launched from within it.
+- Gaming mode toggle (writes to /proc/apex/policy)
+- Real-time status display (screen, charging, audio, thermal)
+- Governor tunable display
+- Incident log viewer (/proc/apex/incidents)
+- Thermal temperature monitor
+
+### Build
+
+```bash
+cd apex-control
+./gradlew assembleRelease
+```
+
+Requires Android SDK 34+ and Kotlin 1.9+.

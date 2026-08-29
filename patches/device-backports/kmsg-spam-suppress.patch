@@ -1,0 +1,28 @@
+From: apex project <apex@local>
+Subject: [PATCH] apex: suppress glink wakeup packet kmsg spam
+
+Replace pr_info with pr_dbg for glink wakeup packet logging.
+
+Signed-off-by: apex project
+diff --git a/drivers/rpmsg/qcom_glink_native.c b/drivers/rpmsg/qcom_glink_native.c
+index 779390256..aea110896 100644
+--- a/drivers/rpmsg/qcom_glink_native.c
++++ b/drivers/rpmsg/qcom_glink_native.c
+@@ -1216,7 +1216,7 @@ static int qcom_glink_rx_data(struct qcom_glink *glink, size_t avail)
+ 		spin_unlock_irqrestore(&channel->recv_lock, flags);
+ 
+ 		if (qcom_glink_is_wakeup(true)) {
+-			pr_info("%s[%d:%d] %s: wakeup packet size:%d\n",
++			pr_dbg("%s[%d:%d] %s: wakeup packet size:%d\n",
+ 				channel->name, channel->lcid, channel->rcid,
+ 				__func__, intent->offset);
+ 		}
+@@ -1322,7 +1322,7 @@ static int qcom_glink_rx_data_zero_copy(struct qcom_glink *glink, size_t avail)
+ 	spin_unlock_irqrestore(&channel->recv_lock, flags);
+ 
+ 	if (qcom_glink_is_wakeup(true)) {
+-		pr_info("%s[%d:%d] %s: wakeup packet size:%d\n", channel->name,
++		pr_dbg("%s[%d:%d] %s: wakeup packet size:%d\n", channel->name,
+ 			channel->lcid, channel->rcid,
+ 			__func__, intent->offset);
+ 	}

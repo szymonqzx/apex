@@ -1,0 +1,28 @@
+From: chickendrop89 <chickendrop89@github.com>
+Subject: [PATCH] apex: fix DWC3 USB deferred probe for PHY
+
+Return -EPROBE_DEFER when PHY is not yet ready so probe is retried.
+
+Signed-off-by: apex project
+diff --git a/drivers/usb/dwc3/dwc3-msm-core.c b/drivers/usb/dwc3/dwc3-msm-core.c
+index 0b96151c7..95ca097ac 100644
+--- a/drivers/usb/dwc3/dwc3-msm-core.c
++++ b/drivers/usb/dwc3/dwc3-msm-core.c
+@@ -5931,6 +5931,8 @@ static int dwc3_msm_parse_core_params(struct dwc3_msm *mdwc, struct device_node
+ 	if (IS_ERR(mdwc->hs_phy)) {
+ 		dev_err(mdwc->dev, "unable to get hsphy device\n");
+ 		ret = PTR_ERR(mdwc->hs_phy);
++		if (ret == -ENODEV)
++			ret = -EPROBE_DEFER;
+ 		return ret;
+ 	}
+ 
+@@ -5939,6 +5941,8 @@ static int dwc3_msm_parse_core_params(struct dwc3_msm *mdwc, struct device_node
+ 	if (IS_ERR(mdwc->ss_phy)) {
+ 		dev_err(mdwc->dev, "unable to get ssphy device\n");
+ 		ret = PTR_ERR(mdwc->ss_phy);
++		if (ret == -ENODEV)
++			ret = -EPROBE_DEFER;
+ 		return ret;
+ 	}
+ 

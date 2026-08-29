@@ -1,5 +1,5 @@
 # APEX System — Complete Design + Build Plan
-### Redmi Note 12 4G (topaz / tapas) · Snapdragon 685 (SM6225-AD) · LineageOS 21/22 + GApps
+### Redmi Note 12 4G (topaz / tapas) · Snapdragon 685 (SM6225-AD) · LineageOS 23.2 + GApps
 
 ---
 
@@ -15,7 +15,7 @@ Apex is a single, integrated, no-clean-flash Android system on the Redmi Note 12
 | :--- | :--- |
 | Flash policy | **Dirty only. No clean flash ever.** |
 | Distribution | Personal-only, never shared |
-| ROM base | Current LineageOS 21/22 + real GApps (kept) |
+| ROM base | Current LineageOS 23.2 + real GApps (kept) |
 | Kernel base | Newest CAF/CLO `bengal-5.15` + ChicKernel device-fix backport |
 | Kernel patches | KernelSU-Next, SuSFS v1.5+, `KERNELSU_HIDE_PID`, `KERNELSU_TRACEPOINT_REMAP` |
 | Kernel hardening | `STRICT_DEVMEM=y`, `kptr_restrict=2`, BTI, PAC, MTE off, `KASLR=y` |
@@ -848,7 +848,7 @@ make O=out ARCH=arm64 \
 Layout:
 
 ```
-apex-kernel-1.0.0-anykernel3.zip
+apex-kernel-1.2.0-anykernel3.zip
 ├── anykernel.sh
 ├── zImage
 ├── dtb (matches stock DTB)

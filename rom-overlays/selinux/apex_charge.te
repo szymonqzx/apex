@@ -1,0 +1,52 @@
+# APEX SELinux policy — Charge Manager procfs access (Enforcing, no permissive)
+#
+# Allows init (via apex_power.rc / apex_profiles.rc) and system_app
+# (Settings, charging apps) to read and write /proc/apex_charge/* entries.
+#
+# The apex_charge kernel module creates /proc/apex_charge/ with these nodes:
+#   charge_limit_percent    — rw (0=disabled, 80-100)
+#   charge_mode             — rw (0=auto, 1=fast, 2=balanced, 3=eco, 4=overnight)
+#   bypass_charging         — rw (0=off, 1=on)
+#   input_suspend           — rw (0=normal, 1=suspend USB input)
+#   thermal_mitigation_idx  — rw (0-9, indexes into PM7250B ICC table)
+#   input_current_limit_ua  — rw (500000-5400000, 0=auto)
+#   fast_charge_current_ua  — rw (500000-5400000, 0=auto)
+#   battery_soh             — r  (state of health %)
+#   battery_cycle_count     — r  (charge cycle count)
+#   battery_temp_c          — r  (temperature in tenths of a degree C)
+#   voltage_now_uv          — r  (battery voltage in microvolts)
+#   current_now_ua          — r  (battery current in microamps)
+#   charging_status         — r  (0=unknown, 1=charging, 2=discharging, 3=full)
+#   charge_time_remaining   — r  (seconds to full, 0 if not charging)
+#   quick_charge_type       — r  (0=none, 1=SDP, 2=DCP, 3=CDP, 4=HVDCP, 5=PD)
+#   status                  — r  (full status overview)
+#
+# Shipped via KernelSU-Next sepolicy.rule mechanism.
+# Source .te; compiled on-device via KSU module or sepolicy-inject.
+
+# Type definition for /proc/apex_charge/ directory and files
+type apex_charge_proc, file_type, fs_type;
+
+# Allow init to read and write all charge manager procfs entries
+# This is the primary access path — apex_power.rc and apex_profiles.rc
+# write to these nodes during boot and profile switches.
+allow init apex_charge_proc:file { read write open getattr setattr };
+allow init apex_charge_proc:dir { search read write add_name remove_name };
+
+# Allow system_app (Settings, charging control apps) to read status
+# and write charge mode/limit. This lets a Settings UI or third-party
+# charging app control the charge manager.
+allow system_app apex_charge_proc:file { read write open getattr };
+allow system_app apex_charge_proc:dir { search read };
+
+# Allow vendor.qti.hardware.charger HAL (if present) to read status
+allow hal_charger_default apex_charge_proc:file { read open getattr };
+allow hal_charger_default apex_charge_proc:dir { search read };
+
+# Allow shell (adb, termux) to read status for debugging
+allow shell apex_charge_proc:file { read open getattr };
+allow shell apex_charge_proc:dir { search read };
+
+# Allow apex_chroot domain to read battery status for the bridge daemon
+allow apex_chroot apex_charge_proc:file { read open getattr };
+allow apex_chroot apex_charge_proc:dir { search read };

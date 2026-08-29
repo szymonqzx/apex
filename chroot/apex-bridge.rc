@@ -1,0 +1,25 @@
+# apex-bridge.rc — init script for the apex-bridge daemon
+# Installed at /vendor/etc/init/apex-bridge.rc
+
+service apex-bridge /system/bin/apex-bridge
+    class main
+    user root
+    group root
+    seclabel u:r:su:s0
+    # Auto-restart on crash (critical for display state monitoring)
+    onrestart restart apex-bridge
+
+on property:sys.boot_completed=1
+    start apex-bridge
+
+# Also start the apex-term mount service (sets up chroot bind mounts)
+service apex-chroot-mount /system/bin/apex-term --mount-only
+    class main
+    user root
+    group root
+    seclabel u:r:su:s0
+    oneshot
+    disabled
+
+on property:apex.chroot.setup=1
+    start apex-chroot-mount

@@ -1,0 +1,8 @@
+config APEX_WATCHDOG
+	bool "apex self-healing watchdog"
+	depends on APEX
+	help
+	  In-kernel watchdog that checks CPU, GPU, thermal, ZRAM, and battery
+	  subsystems every 5 minutes. Attempts recovery on anomaly; panics
+	  after 3 consecutive failures. Exposes /proc/apex/watchdog.
+	  Built-in: must run before userspace.

@@ -1,89 +1,69 @@
-# Kernel patches
+# APEX Kernel Patches
 
-Each subdirectory holds one patch (or a series of patches) for a specific
-kernel subsystem.
+## Applied Patches
 
-## Patches
+### Tier 1: Base & Device Compatibility
+- **ChicKernel 5.15.189 base tree** — imported from ChicKernel/device_xiaomi_gemstones-kernel
+- **Stable upgrade 5.15.189 → 5.15.211** — 3741 files, +45263/-49446, 88 hunks fuzzy-matched
+- **sched_param redefinition** — rename UAPI `struct sched_param` to `__kernel_sched_param` for ROM header compat
+- **Topaz module lists** — 96 module entries, 54 vendor blocklist entries, empty systemdlkm blocklist
+- **Baseband guard (BBG)** — anti-brick modem protection with efisp exploit mode (3 patches)
+- **hdlc_ppp revert** — not needed (CAF tree doesn't have the problematic timer sync code)
 
-| Directory | Purpose | Status |
-| :--- | :--- | :--- |
-| `apex-governor/` | Per-cluster CPU governor with non-linear power curve, iowait boost, hysteresis, fast_switch | **Written** |
-| `apex-state/` | 4-input+gaming compiled state machine, thermal, GPU devfreq, health tick, incidents | **Written** |
-| `apex-watchdog/` | 5-min in-kernel self-heal with 3-strike panic | **Written** |
-| `apex-immortal/` | OOM-immortal task whitelist (desk clock, alarm, bridge) | **Written** |
-| `apex-autoload/` | USB VID:PID → request_module autoloader | **Written** |
-| `apex-baseband-guard/` | BBG efisp exploit mode: ABL/efisp partition whitelisting via cmdline | **Written** |
-| `device-backports/` | SM5602 fuel gauge, DWC3 USB, mi-thermald, USB tether panic, kmsg spam | **Written** |
+### Tier 2: Performance & Optimization (WildKernels common)
+- **disable_cache_hot_buddy** — reduce cache allocation bias
+- **f2fs_enlarge_min_fsync_blocks** — larger fsync batch for F2FS
+- **f2fs_reduce_congestion** — reduce F2FS congestion wait
+- **file_struct_8bytes_align** — 8-byte alignment for file struct
+- **force_tcp_nodelay** — enable TCP_NODELAY by default
+- **increase_ext4_default_commit_age** — longer ext4 commit interval
+- **increase_sk_mem_packets** — larger socket memory allocation
+- **int_sqrt** — optimized integer square root
+- **mem_opt_prefetch** — memory-optimized prefetch
+- **minimise_wakeup_time** — reduce wakeup processing time
+- **optimise_memcmp** — optimized memcmp for arm64
+- **optimized_mem_operations** — general memory operation optimizations
+- **reduce_cache_pressure** — lower vm_cache_pressure
+- **reduce_freeze_timeout** — shorter freeze timeout
+- **reduce_gc_thread_sleep_time** — reduce F2FS GC thread sleep
+- **reduce_pci_pme_wakeups** — reduce PCI PME wakeup events
+- **silence_irq_cpu_logspam** — suppress IRQ CPU hotplug log spam
+- **silence_system_logspam** — suppress system log spam
+- **clear_page_16bytes_align** — 16-byte aligned clear_page
+- **adjust_cpu_scan_order** — optimize CPU scan order for task scheduling
+- **add_limitation_scaling_min_freq** — enforce scaling_min_freq floor
+- **add_timeout_wakelocks_globally** — global wakelock timeout
+- **avoid_extra_s2idle_wake_attempts** — reduce s2idle wake attempts
+- **fake_config** — kernel build config spoofing
+- **IPv6_NAT_FIX** — IPv6 NAT support fix
+- **Droidspaces** — USER_NS guard, ghost task, POSIX mqueue ABI, SYSVIPC KABI (1-8)
 
-## Apply order
+### Tier 2: Networking
+- **BBRv3** — TCP Bottleneck Bandwidth and RTT v3 with PLB (22 files, 3034 insertions)
+- **ntsync** — Windows sync primitives for Wine/Proton gaming (1344 insertions)
 
-```bash
-# Apply all apex patches
-for d in patches/apex-*; do
-    [ -f "$d/apply.sh" ] && bash "$d/apply.sh" ./kernel
-done
+### Tier 3: Root & Security
+- **KSU hooks** — KernelSU-Next manual hook points (execve, faccessat, keyctl, pty, input)
+- **syscall_hooks** — syscall-level hooks for KSU sucompat
+- **ABI bypass GKI** — bypass GKI ABI checks for custom modules
+- **Conditional vendor module blacklisting** — runtime module blacklist support
+- **SuSFS** — already integrated in ChicKernel base (dentry NULL safety checks present)
 
-# Apply device backports
-bash patches/device-backports/apply.sh ./kernel
-```
+### Tier 4: Custom APEX Drivers (from initial skeleton)
+- **apex.c** — APEX state machine: /proc/apex/* surface, 16-row decision table
+- **apex_watchdog.c** — self-healing watchdog: CPU, GPU, thermal, ZRAM, battery checks
+- **apex_immortal.c** — OOM-immortal process protection
+- **cpufreq_apex.c** — APEX CPU frequency governor
 
-## Architecture
+## Patch Sources
+- WildKernels/kernel_patches (common/, wild/hooks, sultan, experimental)
+- topnotchfreaks/kernel_msm-5.15 (zepharo branch — reference for LTS/CLO sync)
+- kernel.org stable (linux-5.15.y branch)
 
-```
-apex-governor (drivers/cpufreq/cpufreq_apex.c)
-  ├── non-linear power curve (quadratic, tunable exponent)
-  ├── iowait boost (UFS app launch latency)
-  ├── hysteresis (prevent freq oscillation)
-  ├── fast_switch (EPSS sub-μs transitions)
-  ├── per-cluster auto-tuning (A73 aggressive, A53 conservative)
-  ├── screen-off ceiling (screen_off_pct)
-  ├── burst passthrough (burst_threshold)
-  └── gaming mode override
-
-apex-state (drivers/apex/apex.c)
-  ├── 5-input decision table (screen, charging, audio, fg-uid, gaming)
-  ├── /proc/apex/* procfs surface
-  ├── thermal zone monitoring (auto-throttle at 45/55/65°C)
-  ├── GPU devfreq integration
-  ├── power_supply notifier (auto-detect charging)
-  ├── RTC wakealarm mirror
-  ├── 5-min health tick
-  ├── 7-day routine learner (framework)
-  ├── panic incident ring
-  └── propagates screen/gaming state to governor
-
-apex-watchdog (drivers/apex/apex_watchdog.c)
-  ├── 5-min periodic delayed_work
-  ├── CPU online mask check + cpu_up() recovery
-  ├── GPU device presence check
-  ├── thermal zone critical check
-  ├── ZRAM block device check
-  ├── battery power_supply check
-  ├── 3-strike → panic
-  └── /proc/apex/watchdog status
-
-apex-immortal (drivers/apex/apex_immortal.c)
-  ├── apex_oom_immortal() called by mm/oom_kill.c
-  ├── built-in whitelist (deskclock, poweroffalarm, apex-bridge, alarmkeeper)
-  ├── runtime sysctl additions (kernel.apex_oom_whitelist)
-  └── patches mm/oom_kill.c via apply.sh
-
-apex-autoload (drivers/usb/core/apex_autoload.c)
-  ├── VID:PID → request_module() for pentest drivers
-  ├── Wi-Fi monitor mode adapters (8812au, ath9k_htc, etc.)
-  ├── SDR (RTL-SDR)
-  └── zero idle drain (modules load only on hardware attach)
-
-device-backports/
-  ├── sm5602-fuelgauge.patch — IRQ probe fix for 5.15.149+
-  ├── dwc3-msm-core.patch — PHY binding order fix for 5.15.149+
-  ├── mi-thermald-wrong-core.patch — correct cluster shutdown order
-  ├── usb-tether-panic.patch — completion wait before endpoint cleanup
-  └── kmsg-spam-suppress.patch — reduce vendor module log noise
-
-apex-baseband-guard/
-  ├── bbg-kconfig-recovery.patch — add CONFIG_BBG_BLOCK_RECOVERY option
-  ├── bbg-efisp-exploit.patch — efisp exploit allowlist + oplusboot.secure_user_mode cmdline
-  ├── anykernel-bbg-efisp-menu.patch — volume-key menu in AnyKernel3 installer
-  └── apply.sh — idempotent patch applier (BBG submodule + anykernel3)
-```
+## Skipped Patches (with reasons)
+- Sultan hooks — conflict with wild/hooks (same files, already applied)
+- QRTR xarray refactor — ABI-breaking upstream change, CAF QRTR is functional
+- F2FS upstream cleanups — CAF F2FS works, WildKernels F2FS optimizations applied instead
+- xhci graceperiod — feature not present in CAF tree
+- regmap NULL check removal — unsafe (removes safety check)
+- timer.h type change — ABI-breaking

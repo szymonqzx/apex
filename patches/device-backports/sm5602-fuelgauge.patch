@@ -1,0 +1,21 @@
+From: chickendrop89 <chickendrop89@github.com>
+Subject: [PATCH] apex: fix SM5602 fuel gauge probe reliability
+
+Return -EPROBE_DEFER when GPIO is invalid so the probe is retried.
+
+Signed-off-by: apex project
+diff --git a/drivers/power/supply/nopmi/sm5602_fg.c b/drivers/power/supply/nopmi/sm5602_fg.c
+index b1c0468b7..bd27c46f0 100644
+--- a/drivers/power/supply/nopmi/sm5602_fg.c
++++ b/drivers/power/supply/nopmi/sm5602_fg.c
+@@ -4702,8 +4702,9 @@ static int fg_common_parse_dt(struct sm_fg_chip *sm)
+ 	pr_info("gpio_int=%d\n", sm->gpio_int);
+ 
+ 	if (!gpio_is_valid(sm->gpio_int)) {
+-		pr_info("gpio_int is not valid\n");
++		pr_info("gpio_int is not valid, deferring probe\n");
+ 		sm->gpio_int = -EINVAL;
++		return -EPROBE_DEFER;
+ 	}
+ #endif
+     /* EN TEMP EX/IN */

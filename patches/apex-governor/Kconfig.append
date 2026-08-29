@@ -1,0 +1,26 @@
+# Choice option (must be inside the choice block, before endchoice)
+config CPU_FREQ_DEFAULT_GOV_APEX
+	bool "apex"
+	depends on CPU_FREQ
+	select CPU_FREQ_GOV_APEX
+	help
+	  Use the 'apex' governor as the default.
+
+# Governor definition (goes after endchoice, alongside other governors)
+config CPU_FREQ_GOV_APEX
+	tristate "'apex' cpufreq policy governor"
+	depends on CPU_FREQ
+	select CPU_FREQ_GOV_COMMON
+	help
+	  'apex' - per-cluster governor for the A73/A53 clusters with:
+	  - non-linear power-curve load mapping (quadratic default, tunable)
+	  - screen-off ceiling (screen_off_pct) and burst passthrough
+	  - iowait boost for UFS app-launch latency
+	  - hysteresis to prevent frequency oscillation
+	  - fast_switch support for EPSS sub-microsecond transitions
+	  - per-cluster auto-tuning (aggressive on A73, conservative on A53)
+	  - gaming mode override (always max within thermal limits)
+	  EAS-aware: honors policy->max caps.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called cpufreq_apex.

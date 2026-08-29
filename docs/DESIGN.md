@@ -1,5 +1,5 @@
 # APEX System — Complete Design + Build Plan
-### Redmi Note 12 4G (topaz / tapas) · Snapdragon 685 (SM6225-AD) · LineageOS 21/22 + GApps
+### Redmi Note 12 4G (topaz / tapas) · Snapdragon 685 (SM6225-AD) · LineageOS 23.2 + GApps
 
 ---
 
@@ -15,7 +15,7 @@ Apex is a single, integrated, no-clean-flash Android system on the Redmi Note 12
 | :--- | :--- |
 | Flash policy | **Dirty only. No clean flash ever.** |
 | Distribution | Personal-only, never shared |
-| ROM base | Current LineageOS 21/22 + real GApps (kept) |
+| ROM base | Current LineageOS 23.2 (Android 16 / AOSP 16 QPR2) + real GApps (kept) |
 | Kernel base | Newest CAF/CLO `bengal-5.15` + ChicKernel device-fix backport |
 | Kernel patches | KernelSU-Next, SuSFS v1.5+, `KERNELSU_HIDE_PID`, `KERNELSU_TRACEPOINT_REMAP` |
 | Kernel hardening | `STRICT_DEVMEM=y`, `kptr_restrict=2`, BTI, PAC, MTE off, `KASLR=y` |
@@ -391,7 +391,9 @@ All loaded as modules (`.ko`) so the system has **zero idle drain** when no exte
 
 ### 6.1 `/system/build.prop` overlay (PIF, no module)
 
-Append to `/system/build.prop` (LineageOS leaves the partition writable via remount, or use `apex-bridge` to apply):
+Append to `/system/build.prop` (LineageOS 23.2 leaves the partition writable via remount, or use `apex-dirty-modify.sh` to apply):
+
+The overlay spoofs a stock Xiaomi MIUI build fingerprint (V816.0.7.0.UMGMIXM, Android 13) that Play Integrity accepts for this device model. The actual LineageOS 23.2 SDK level (36) is preserved — Play Integrity DEVICE tier checks the fingerprint, not the SDK. STRONG tier is handled by TrickyStore + Yurikey keybox.
 
 ```ini
 # PIF: stock-equivalent values for this build ID + security patch
@@ -848,7 +850,7 @@ make O=out ARCH=arm64 \
 Layout:
 
 ```
-apex-kernel-1.0.0-anykernel3.zip
+apex-kernel-1.2.0-anykernel3.zip
 ├── anykernel.sh
 ├── zImage
 ├── dtb (matches stock DTB)
@@ -861,18 +863,18 @@ Flash via TWRP (don't wipe data).
 
 ### Step 5 — Apply ROM overlays (dirty)
 
+Two methods:
+
+**Method A — Via AnyKernel3 zip (automatic):** The AnyKernel3 zip includes all overlays in `/tmp/anykernel/overlays/`. The `post_install_overlays()` function in `anykernel.sh` applies them during flash — no separate step needed.
+
+**Method B — Manual dirty-apply (no reflash needed):** If the kernel is already flashed and you only want to update ROM overlays:
+
 ```bash
-# Use the apex-bridge socket to remount /system rw and apply overlays.
-# No TWRP needed.
-apex-bridge apply-overlay /system/build.prop
-apex-bridge apply-overlay /vendor/build.prop
-apex-bridge install-init /vendor/etc/init/apex_power.rc
-apex-bridge install-thermald /vendor/etc/thermald.conf
-apex-bridge install-alarmkeeper /vendor/bin/apex-alarmkeeper
-apex-bridge install-selinux /system/etc/selinux/apex_chown.te
+adb push tools/apex-dirty-modify.sh /data/local/tmp/
+adb shell su -c "sh /data/local/tmp/apex-dirty-modify.sh"
 ```
 
-Each overlay writes to the existing partition; no clean flash.
+The script is idempotent (safe to re-run), backs up original files to `/data/adb/apex/backup-pre-apex/`, and writes an install manifest to `/data/adb/apex/install_manifest.json`.
 
 ### Step 6 — Install KernelSU-Next + Zygisk-Next + hiding stack
 

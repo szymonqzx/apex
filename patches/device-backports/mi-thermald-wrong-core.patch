@@ -1,0 +1,31 @@
+From: chickendrop89 <chickendrop89@github.com>
+Subject: [PATCH] apex: fix mi_thermald wrong-core thermal mitigation
+
+Add CPU validity check and debug log for unrecognized CPU numbers.
+
+Signed-off-by: apex project
+diff --git a/drivers/thermal/mi_thermal_interface.c b/drivers/thermal/mi_thermal_interface.c
+index defeaa1ee..b5f4fb867 100644
+--- a/drivers/thermal/mi_thermal_interface.c
++++ b/drivers/thermal/mi_thermal_interface.c
+@@ -87,9 +87,11 @@ void cpu_limits_set_level(unsigned int cpu, unsigned int max_freq)
+ {
+ 	struct cpufreq_device *cpufreq_dev;
+ 	unsigned int level = 0;
++	bool found = false;
+ 
+ 	list_for_each_entry(cpufreq_dev, &cpufreq_dev_list, node) {
+ 		if (cpufreq_dev->id == cpu) {
++			found = true;
+ 			for (level = 0; level <= cpufreq_dev->max_level; level++) {
+ 				int target_freq = cpufreq_dev->freq_table[level].frequency;
+ 				if (max_freq >= target_freq) {
+@@ -100,6 +102,8 @@ void cpu_limits_set_level(unsigned int cpu, unsigned int max_freq)
+ 			break;
+ 		}
+ 	}
++	if (!found)
++		pr_debug("cpu_limits: CPU %u not found in cpufreq_dev_list\n", cpu);
+ }
+ 
+ static unsigned int find_next_max(struct cpufreq_frequency_table *table,

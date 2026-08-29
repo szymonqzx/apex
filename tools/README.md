@@ -1,12 +1,36 @@
-# Build tools
+# tools
 
-Helper scripts. **Nothing is written yet.**
+Build, verification, and packaging tools for the APEX kernel.
 
-## Plan
+## Files
 
-- `build-kernel.sh`     — `make` invocation with the right clang flags
-- `apply-overlays.sh`   — Dirty-apply build.prop/init rc/selinux via apex-bridge
-- `package-anykernel3.sh` — Zip the kernel + modules into AnyKernel3 format
-- `setup-chroot.sh`     — Download + extract Arch rootfs, install pkglist
-- `verify.sh`           — The 8-point verification checklist
-- `doctor.sh`           — `apex doctor` style diagnostic
+| File | Purpose |
+| :--- | :--- |
+| `build-kernel.sh` | Apply patches, merge defconfig fragments, build kernel |
+| `check-configs.py` | Verify defconfig fragment consistency (no conflicts, deps met) |
+| `verify.sh` | Verify build output (Image, modules, dtb, version string) |
+| `package-anykernel3.sh` | Package kernel + modules + overlays into flashable zip |
+
+## Usage
+
+```bash
+# 1. Check config fragments for conflicts
+python3 tools/check-configs.py
+
+# 2. Build the kernel (applies patches, merges fragments, builds)
+./tools/build-kernel.sh chickernel_defconfig [ksun|ksun.susfs]
+
+# 3. Verify the build
+./tools/verify.sh
+
+# 4. Package for flashing
+./tools/package-anykernel3.sh
+```
+
+## Build requirements
+
+- Clang 19+ (Android LLVM toolchain)
+- LLD (LLVM linker)
+- aarch64-linux-gnu- cross-compiler (for modules)
+- `scripts/kconfig/merge_config.sh` (in kernel tree)
+- `zip` (for AnyKernel3 packaging)

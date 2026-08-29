@@ -1,0 +1,91 @@
+From: apex project <apex@kernel>
+Subject: [PATCH] apex: use corrected 5000mAh BN5M battery data
+
+Replace the QRD 3600mAh alium battery data profile with the corrected
+5000mAh BN5M profile for the commercial Redmi Note 12 4G (topaz/tapas).
+
+The stock CAF device tree ships qg-batterydata-alium-3600mah.dtsi which
+is a Qualcomm Reference Design profile for a 3600mAh test battery. The
+commercial device has a 5000mAh BN5M Li-Po cell. Using the wrong design
+capacity causes the QG fuel gauge to report incorrect SoC and cycle count.
+
+This patch:
+  1. Adds bn5m-5000mah-batterydata.dtsi to the kernel device tree
+  2. Changes the battery-data reference from alium-3600mah to bn5m-5000mah
+
+The only functional change is design-capacity-mah (3600→5000). All other
+values (max voltage, FCC, JEITA ranges, NTC thermistor, battery ID resistor)
+are physical properties that remain the same.
+
+Signed-off-by: apex project
+---
+diff --git a/arch/arm64/boot/dts/qcom/bn5m-5000mah-batterydata.dtsi b/arch/arm64/boot/dts/qcom/bn5m-5000mah-batterydata.dtsi
+new file mode 100644
+index 000000000000..111111111111
+--- /dev/null
++++ b/arch/arm64/boot/dts/qcom/bn5m-5000mah-batterydata.dtsi
+@@ -0,0 +1,75 @@
++/*
++ * bn5m-5000mah-batterydata.dtsi — Corrected battery profile for
++ * Redmi Note 12 4G (topaz/tapas) BN5M 5000mAh Li-Po cell.
++ *
++ * Replaces the QRD 3600mAh alium profile with correct 5000mAh data.
++ * Only design-capacity-mah changes; all physical properties are identical.
++ */
++
++&pm7250b_qg {
++	qcom,battery-data = <&bn5m_batterydata>;
++};
++
++&pm7250b_charger {
++	qcom,battery-data = <&bn5m_batterydata>;
++};
++
++bn5m_batterydata: qcom,battery-data {
++	compatible = "qcom,battery-data";
++	qcom,battery-id = <0>;
++	#address-cells = <1>;
++	#size-cells = <1>;
++
++	qcom,batt-id-kohm = <107>;
++	qcom,battery-beta = <4250>;
++	qcom,battery-therm-kohm = <100>;
++	qcom,design-capacity-mah = <5000>;
++	qcom,max-voltage-uv = <4350000>;
++	qcom,fg-cc-cv-threshold-uv = <4340000>;
++	qcom,fastchg-current-ma = <5400>;
++
++	qcom,jeita-fcc-ranges = <
++		0    50   2500000
++		51   400  5400000
++		401  450  2500000
++	>;
++
++	qcom,jeita-fv-ranges = <
++		0    50   4250000
++		51   400  4350000
++		401  450  4250000
++	>;
++
++	qcom,step-charging-ranges = <
++		3600000     3800000  5400000
++		3800001     4300000  3600000
++		4300001     4350000  2500000
++	>;
++
++	qcom,jeita-soft-thresholds = < 5 40 >;
++	qcom,jeita-hard-thresholds = < 0 45 >;
++};
+diff --git a/arch/arm64/boot/dts/qcom/khaje-idp-pm7250b.dtsi b/arch/arm64/boot/dts/qcom/khaje-idp-pm7250b.dtsi
+index 222222222222..333333333333 100644
+--- a/arch/arm64/boot/dts/qcom/khaje-idp-pm7250b.dtsi
++++ b/arch/arm64/boot/dts/qcom/khaje-idp-pm7250b.dtsi
+@@ -1,7 +1,8 @@
+
+ #include "pm7250b.dtsi"
+-#include "qg-batterydata-alium-3600mah.dtsi"
++/* APEX: Use corrected 5000mAh BN5M battery data (was QRD 3600mAh alium) */
++#include "bn5m-5000mah-batterydata.dtsi"
+
+ &pm7250b_charger {
+ 	qcom,sec-charger-config = <2>;
