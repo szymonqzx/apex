@@ -1,0 +1,30 @@
+From: apex project <apex@kernel>
+Subject: [PATCH] bbg: add CONFIG_BBG_BLOCK_RECOVERY for efisp exploit allowlist
+
+Adds a new Kconfig option to control recovery partition protection
+in the default allowlist. The efisp-exploit allowlist always includes
+recovery regardless of this setting.
+
+Source: https://github.com/WildKernels/kernel_patches/tree/main/common/bbg
+
+Signed-off-by: apex project
+
+--- a/Baseband-guard/Kconfig	2026-08-29 16:51:24.525700154 +0200
++++ b/Baseband-guard/Kconfig	2026-08-29 16:51:24.585459734 +0200
+@@ -35,6 +35,16 @@
+           fastboot mode).
+           If unsure, leave this n.
+ 
++config BBG_BLOCK_RECOVERY
++       bool "Enable Baseband Protection for Recovery Partition"
++       depends on BBG
++       default n
++       help
++         Enable protection for recovery partition in the default
++         (secure) allowlist. The efisp-exploit allowlist always
++         includes recovery regardless of this setting.
++         If unsure, leave this n.
++
+ config BBG_DOMAIN_PROTECTION
+        bool "Interception for malicious Selinux domain switching"
+        depends on BBG
