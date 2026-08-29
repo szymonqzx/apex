@@ -1,0 +1,43 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: apex kernel <apex@kernel>
+Date: Sat, 29 Aug 2026 17:00:00 +0200
+Subject: [PATCH] uapi: sched: rename sched_param to __kernel_sched_param
+
+Rename the UAPI struct sched_param to __kernel_sched_param to avoid
+a conflict with bionic's sched_param in <sched.h>. This is needed for
+AOSP ROM (LineageOS, etc.) compilation against the apex kernel headers.
+
+The internal kernel code uses its own struct sched_param from
+include/linux/sched.h (forward declaration), so the UAPI rename only
+affects userspace-visible headers.
+
+Based on LineageOS commit f0b1169abd007a6c3417270047297b942e727553
+and SM6225-Android-Playground commit 2e2880a8513be97089a53fd5c2fdcb06891e2ac6.
+
+Signed-off-by: apex kernel <apex@kernel>
+---
+ include/uapi/linux/sched/types.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/include/uapi/linux/sched/types.h b/include/uapi/linux/sched/types.h
+index 0000000..1111111 100644
+--- a/include/uapi/linux/sched/types.h
++++ b/include/uapi/linux/sched/types.h
+@@ -4,7 +4,7 @@
+ 
+ #include <linux/types.h>
+ 
+-struct sched_param {
++struct __kernel_sched_param {
+ 	int sched_priority;
+ };
+ 
+@@ -14,7 +14,7 @@ struct sched_param {
+  * This is needed because the original struct sched_param can not be
+  * altered without introducing ABI issues with legacy applications
+  * (e.g., in sched_getparam()).
+- * However, the possibility of specifying more than just a priority for
++ * However, the possibility of specifying more than just a priority for
+  * the tasks may be useful for a wide variety of application fields, e.g.,
+  * multimedia, streaming, automation and control, and many others.
+  * This variant (sched_attr) allows to define additional attributes to
