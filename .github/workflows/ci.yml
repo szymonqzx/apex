@@ -1,0 +1,95 @@
+name: APEX Kernel CI
+
+on:
+  push:
+    branches: [feat/zepharo-rebase, main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  certification-tests:
+    name: Certification Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install pytest jsonschema
+
+      - name: Run certification tests
+        run: python3 -m pytest tests/cert/ -v --tb=short
+
+  config-validation:
+    name: Config Fragment Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Validate config fragments
+        run: |
+          echo "=== Checking config fragments ==="
+          for frag in defconfig/apex-modern.config defconfig/apex-security.config; do
+            if [ -f "$frag" ]; then
+              echo "  $frag: $(grep -c 'CONFIG_' $frag) options"
+              # Check for duplicates
+              dupes=$(grep -oP 'CONFIG_\w+' "$frag" | sort | uniq -d)
+              if [ -n "$dupes" ]; then
+                echo "ERROR: Duplicate configs in $frag: $dupes"
+                exit 1
+              fi
+            fi
+          done
+          echo "=== All fragments valid ==="
+
+  schema-validation:
+    name: JSON Schema Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install jsonschema
+        run: pip install jsonschema
+
+      - name: Validate schemas
+        run: |
+          python3 -c "
+          import json, jsonschema, pathlib
+          schemas = list(pathlib.Path('schemas').glob('*.schema.json'))
+          if not schemas:
+              print('No schemas found — skipping')
+          for s in schemas:
+              schema = json.loads(s.read_text())
+              jsonschema.Draft7Validator.check_schema(schema)
+              print(f'  {s.name}: valid')
+          print('All schemas valid')
+          "
+
+  build-check:
+    name: Build Script Syntax Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check build script syntax
+        run: |
+          bash -n tools/build-kernel.sh
+          bash -n tools/package-anykernel3.sh
+          for apply in patches/apex-new/*/apply.sh; do
+            bash -n "$apply"
+            echo "  $apply: syntax OK"
+          done
+
+      - name: Verify anykernel.sh syntax
+        run: bash -n anykernel3/anykernel.sh

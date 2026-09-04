@@ -23,3 +23,8 @@ chroot/rootfs/rootfs/
 *.local
 kernel-5.15.189-legacy/
 patches/quarantine/
+
+# Release artifacts
+*.zip
+*.zip.sha256
+apex-release-*.manifest
