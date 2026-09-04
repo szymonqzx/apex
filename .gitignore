@@ -9,6 +9,16 @@ out/
 *.img
 *.zip
 
+# Build logs
+build.log
+warnings.log
+*.build.log
+
+# Python
+__pycache__/
+.pytest_cache/
+*.pyc
+
 # Toolchains
 clang-r*/
 aarch64-linux-gnu-*/
@@ -17,12 +27,13 @@ arm-linux-gnueabi-*/
 # Source clones
 kernel/
 chroot/rootfs/rootfs/
+kernel-5.15.189-legacy/
 
 # Local-only
 .env
 *.local
-kernel-5.15.189-legacy/
 patches/quarantine/
+pending_*.diff
 
 # Release artifacts
 *.zip

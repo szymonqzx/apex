@@ -1,147 +1,137 @@
-# APEX kernel — Redmi Note 12 4G (topaz)
+# APEX kernel
 
-A custom kernel for the Redmi Note 12 4G (Snapdragon 685 / SM6225-AD)
-based on the ChicKernel 5.15.189 tree with KernelSU-Next and SuSFS.
+A hardened, modern custom kernel for the **Redmi Note 12 4G** (topaz / tapas,
+Snapdragon 685 / SM6225-AD), built on the **Zepharo R9** base (Linux 5.15.170,
+CAF msm-5.15). GKI-compatible: kernel Image replaces the ROM's `boot` partition
+while the ROM's ramdisk, DTB, and vendor modules are untouched.
 
-## What's in the box
+## Highlights
 
-### Kernel patches (patches/)
+- **Modern toolchain**: Clang 22 + LLD, ThinLTO, DWARF5 debug info
+- **Scheduler**: WALT load tracking (built-in) + EAS + UCLAMP, PREEMPT, HZ=250
+- **Security hardening**: CFI, KASLR, Shadow Call Stack, SLAB freelist
+  hardening, lockdown LSM, unprivileged BPF disabled, userfaultfd disabled
+- **Memory**: MGLRU enabled at boot, KSM, ZRAM (ZSTD) built-in
+- **Device drivers**: fingerprint (FPC/Goodix), charger ICs (BQ2589X, SC8551,
+  SM5602, LN8000), MI thermal, ANT check, battery authentication — ported from
+  the topaz legacy tree
+- **APEX control plane**: `/sys/class/apex/` sysfs class + charge control
+  module (charge limiting, mode, bypass, live battery telemetry)
+- **Zero-warning build**: all Clang 22 diagnostics resolved; APEX code is
+  checkpatch-clean
 
-- **apex-governor** — Per-cluster CPU governor with non-linear power curve,
-  iowait boost, hysteresis, fast_switch (EPSS), per-cluster auto-tuning,
-  gaming mode, and screen-off ceiling
-- **apex-state** — In-kernel control plane: 5-input decision table,
-  thermal monitoring, GPU devfreq, GPU min clock floor (gaming),
-  CPU cluster isolation (gaming), health tick, incident ring, RTC wakealarm
-- **apex-charge** — Advanced charging & battery manager for PM7250B SMB5.
-  5000mAh BN5M battery, 33W HVDCP3 fast charge. Sysfs-controlled charge
-  limiting (80-100%), 4 charging profiles (fast/balanced/eco/overnight),
-  thermal mitigation (10-step ICC), bypass charging via SMB1355 parallel,
-  input suspension, SoH estimation, cycle count, quick charge type detection.
-  Integrated with apex.c health tick for automatic JEITA-aware thermal
-  mitigation. SELinux policy (apex_charge.te) allows init/system_app/shell
-  to access /proc/apex_charge/*. Corrected batterydata DTSI (5000mAh) replaces
-  the QRD 3600mAh profile. Coexists with hvdcp_opti daemon (different layers).
-- **apex-watchdog** — Self-healing watchdog: 5-min subsystem checks,
-  3-strike panic, CPU/GPU/thermal/ZRAM/battery monitoring
-- **apex-immortal** — OOM-immortal whitelist for critical tasks
-  (desk clock, alarm, bridge daemon)
-- **apex-autoload** — USB VID:PID autoloader for pentest drivers
-- **apex-display** — KCAL display color calibration (RGB gain via sysfs)
-- **apex-lmk** — Simple LMK: adj-bucketed, size-sorted memory pressure
-  killer with dedicated reaper thread and RT priority (adapted from
-  Sultan Alsawaf's Simple LMK architecture)
-- **apex-memfreq** — Memory bandwidth DEVFREQ driver: scales LPDDR4X
-  bandwidth based on CPU utilization (real SM6225 interconnect IDs
-  from device tree: MASTER_AMPSS_M0 → SLAVE_EBI_CH0)
-- **apex-cpuboost** — Input-driven CPU frequency booster: hooks into
-  touch events to boost policy min frequency for immediate responsiveness
-  (inspired by Qualcomm cpu-boost driver)
-- **apex-thermal-uclamp** — Thermal cooling device using Energy Model:
-  smooth frequency capping via uclamp instead of sudden throttling
-  (inspired by Google cdev_uclamp from Pixel kernel)
-- **apex-blx** — Backlight dimmer: caps max brightness on battery for
-  AMOLED power savings, auto-removes cap when charging
-- **device-backports** — SM5602 fuel gauge, DWC3 USB, mi_thermald,
-  USB tether panic, kmsg spam suppression
+## Repository layout
 
-### Defconfig fragments (defconfig/)
+```
+defconfig/
+  apex_defconfig        # Single source of truth (tracked in git)
+patches/apex-new/       # Patch series applied to the kernel tree
+  series                # Ordered list of patches
+  <name>/apply.sh       # Idempotent per-patch installer
+anykernel3/             # AnyKernel3 flashable packaging
+tools/                  # Build / verify / package / release tooling
+tests/cert/             # Certification test suite (pytest)
+rom-overlays/           # init scripts, profiles, thermald, SELinux, PIF
+apps/                   # Android control app (Jetpack Compose)
+chroot/                 # Bridge daemon + chroot wrappers
+docs/                   # Architecture and design docs
+releases/               # Release artifacts (zip + checksum + manifest)
+```
 
-- scheduler.config — PREEMPT, HZ=250, WALT, CASS, EAS, PSI, CPU idle stack,
-  power-efficient workqueues, forced lazy RCU
-- governor.config — apex governor, schedutil fallback, EPSS
-- hardening.config — STRICT_DEVMEM, CFI, KASLR, no USERFAULTFD
-- performance.config — interconnect, DCVS, BFQ, TCP BBR+Westwood, FQ scheduler
-- zram.config — ZSTD + writeback, KSM, transparent huge pages, MGLRU
-- root.config — KernelSU-Next + SuSFS
-- pentest.config — NetHunter drivers as modules, WireGuard VPN
-- toolchain.config — Clang 22 + LLD + ThinLTO
-- filesystems.config — exFAT, NTFS3 (USB OTG storage support)
-- display.config — KCAL display color calibration
-- version.config — Localversion
+> `kernel/` is not in git — it is the Zepharo R9 base tree, extracted
+> separately. `tools/build-kernel.sh` applies the patch series and syncs the
+> tracked defconfig into it, so a clean checkout reproduces the build.
 
-### Build tools (tools/)
+## Building
 
-- build-kernel.sh — Apply patches, merge fragments, build
-- check-configs.py — Verify config consistency
-- verify.sh — Verify build output (20+ checks)
-- package-anykernel3.sh — Create flashable zip
-- autofdo-build.sh — AutoFDO profile-guided build pipeline
-- investigate-sm6225-repos.sh — Diff xiaomi-6225-AD repos for backports
-- irq-balance-check.sh — Review IRQ distribution on-device
-- zram-benchmark.sh — A/B benchmark zRAM compression algorithms
-
-### Userspace (chroot/ + apps/)
-
-- apex-bridge — Daemon bridging Android framework to /proc/apex/*
-- apex-term — Chroot entry wrapper
-- apex-control — Jetpack Compose control app (gaming toggle, status,
-  governor, watchdog, health, sensors, BT, thermal profile, stats,
-  KCAL RGB calibration, incident log viewer, auto-refresh)
-
-### ROM overlays (rom-overlays/)
-
-- apex_power.rc — init.d script for screen/gaming/charging state, LMK tuning,
-  ZRAM configuration, GPU governor switching, CPU boost configuration
-- apex_profiles.rc — Three-switchable-profile system (Battery/Balanced/Performance)
-  with per-profile schedutil ramp asymmetry, WALT upmigrate thresholds, GPU clock
-  caps, charge limits (80/90/100%), and charging thermal throttle
-- thermald.conf — Thermal trip points (45/55/65°C, replaces mi_thermald)
-- SELinux policy for chroot domain (apex_chown.te)
-- build.prop overlays for PIF (Xiaomi stock fingerprint for Play Integrity)
-- hidden_packages.list — HMA-OSS blacklist for Magisk/APatch/LSPosed residue
-
-### Dirty ROM modification (tools/apex-dirty-modify.sh)
-
-On-device script that applies all ROM overlays to a running LineageOS 23.2
-install without formatting. Idempotent, backs up originals, writes install
-manifest. Can be pushed via adb and run as root, or applied automatically
-during AnyKernel3 flash.
-
-## Quick start
+Requirements: clang 22+, LLVM binutils, `aarch64-linux-gnu-gcc`, `zip`,
+`bc`, `bison`, `flex`, `libssl-dev`, `libelf-dev`, python3 + pytest.
 
 ```bash
-# 1. Check configs
+# 1. Extract the Zepharo R9 kernel source to kernel/
+#    (topnotchfreaks/kernel_msm-5.15, tag ZEPHARO)
+
+# 2. Apply the patch series (idempotent)
+./tools/apply-patches.sh
+
+# 3. Build (incremental by default; --clean for a full rebuild)
+./tools/build-kernel.sh
+
+# 4. Verify the build output
+./tools/verify.sh --strict
+
+# 5. Package a flashable zip
+./tools/package-anykernel3.sh
+```
+
+## Installing
+
+Flash the AnyKernel3 zip in recovery (TWRP/OrangeFox) on top of a
+GKI-compatible ROM (LineageOS / AOSP 13–16). No data wipe.
+
+```bash
+adb push releases/apex-kernel-<ver>-anykernel3.zip /sdcard/
+# reboot to recovery, flash
+```
+
+The kernel Image replaces the `boot` partition. Kernel modules are installed
+to `/vendor/lib/modules/` with depmod metadata, and
+`apex-load-modules.sh` (installed to `/vendor/bin/`) loads critical modules
+in the correct order at boot.
+
+## APEX control plane
+
+After boot, the kernel exposes:
+
+- `/sys/class/apex/version` — kernel version
+- `/sys/class/apex/base` — base tree
+- `/sys/class/apex/enabled_features` — feature list
+- `/sys/class/apex/charge/charge_limit_percent` — charge limit (80–100, 0=off)
+- `/sys/class/apex/charge/charge_mode` — auto / fast / balanced / eco
+- `/sys/class/apex/charge/bypass_charging` — bypass toggle
+- `/sys/class/apex/charge/status` — JSON battery telemetry
+
+```bash
+# Limit charging to 85%
+echo 85 > /sys/class/apex/charge/charge_limit_percent
+```
+
+## Profile switching
+
+Battery / balanced / performance profiles are runtime-only: set
+`apex.profile=battery|balanced|performance` and
+`rom-overlays/init.d/apex_profiles.rc` applies the matching sysfs tunables
+(governor ramp, WALT migration thresholds, GPU clocks, thermal trips, charge
+limits).
+
+## Configuration
+
+`defconfig/apex_defconfig` is the single source of truth — no fragment
+merging. Validate it with:
+
+```bash
 python3 tools/check-configs.py
-
-# 2. Build (supports --profile battery|balanced|performance)
-./tools/build-kernel.sh chickernel_defconfig ksun --profile balanced
-
-# 2b. Optional: Neutron Clang toolchain
-NEUTRON_CLANG=/path/to/neutron/clang ./tools/build-kernel.sh chickernel_defconfig ksun
-
-# 3. Verify
-./tools/verify.sh
-
-# 4. Package (includes all ROM overlays + dirty-modify + wakelock audit)
-APEX_PROFILE=balanced ./tools/package-anykernel3.sh
-
-# 5. Flash (kernel + overlays in one zip)
-adb push apex-kernel-1.2.0-balanced-anykernel3.zip /sdcard/
-# Reboot to recovery, flash the zip — no data wipe
-
-# 5b. Or dirty-apply overlays only (no kernel reflash):
-adb push tools/apex-dirty-modify.sh /data/local/tmp/
-adb shell su -c "sh /data/local/tmp/apex-dirty-modify.sh"
-
-# 6. Audit wakelocks (standby drain diagnosis):
-adb push tools/apex-wakelock-audit.sh /data/local/tmp/
-adb shell su -c "sh /data/local/tmp/apex-wakelock-audit.sh"
 ```
 
-## Architecture
+## Testing
 
+```bash
+# Certification suite (91 tests: build, rollback, charge invariants, config)
+python3 -m pytest tests/cert/ -v
 ```
-SM6225-AD (Snapdragon 685)
-├── 4x Cortex-A73 @ 2.8 GHz (big cluster, EPSS DVFS)
-├── 4x Cortex-A53 @ 1.9 GHz (little cluster, EPSS DVFS)
-├── Adreno 610 @ 1260 MHz (KGSL, devfreq)
-├── LPDDR4X @ 2133 MHz
-├── UFS 2.2
-└── 5000 mAh battery (SM5602 fuel gauge)
 
-Kernel: Linux 5.15.189 (CAF bengal-5.15)
-Scheduler: CASS + WALT + schedutil fallback
-Governor: apex (non-linear power curve, iowait boost, hysteresis)
-Root: KernelSU-Next + SuSFS
+## Releasing
+
+```bash
+./tools/release.sh 0.2.1 --build
 ```
+
+Runs config checks + certification tests + build + verify + package, then
+creates the git tag `v0.2.1-zepharo`, checksums, and a release manifest in
+`releases/`.
+
+## License
+
+GPL-2.0 (see [LICENSE](LICENSE)). The kernel base is Zepharo R9
+(topnotchfreaks/kernel_msm-5.15); device-specific drivers are ported from the
+Xiaomi topaz legacy tree.
