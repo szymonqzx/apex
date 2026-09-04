@@ -37,7 +37,7 @@ while [ $# -gt 0 ]; do
 done
 
 # --- Version info ---
-APEX_VERSION="0.3.0-zepharo"
+APEX_VERSION="0.4.0-zepharo"
 GIT_HASH="$(cd "$APEX" 2>/dev/null && git rev-parse --short HEAD 2>/dev/null || echo 'unknown')"
 BUILD_DATE="$(date '+%Y-%m-%d %H:%M:%S')"
 

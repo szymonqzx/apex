@@ -105,6 +105,19 @@ else
   warn "WALT not detected in Image (CONFIG_SCHED_WALT)"
 fi
 
+# --- 5a. Native root + SUSFS ----------------------------------------------
+if in_image "KernelSU" || in_image "kernelsu"; then
+  ok "KernelSU-Next (native root) compiled in"
+else
+  warn "KernelSU-Next not detected in Image (CONFIG_KSU)"
+fi
+
+if in_image "susfs"; then
+  ok "SUSFS (root hiding) compiled in"
+else
+  warn "SUSFS not detected in Image (CONFIG_KSU_SUSFS)"
+fi
+
 # --- 5b. Baseband guard ----------------------------------------------------
 if in_image "baseband_guard" || in_image "protect All Block"; then
   ok "Baseband Guard (anti-brick LSM) compiled in"

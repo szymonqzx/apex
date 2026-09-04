@@ -128,3 +128,34 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 [0.2.0-zepharo]: https://github.com/szymonqzx/apex-kernel/releases/tag/v0.2.0-zepharo
 [0.1.0-zepharo]: https://github.com/szymonqzx/apex-kernel/releases/tag/v0.1.0-zepharo
+
+## [0.4.0-zepharo] — planned
+
+### Added
+- **Native root**: KernelSU-Next integrated (kprobes-based, no manual hook
+  points). `CONFIG_KSU=y`. kprobes + ext4 deps already enabled.
+- **Root hiding**: SUSFS (`simonpunk/susfs4ksu`) — path hiding, mount hiding,
+  kstat spoofing, maps spoofing, try_umount, uname spoof. `CONFIG_KSU_SUSFS=y`
+  + suboptions. SUSFS commands are dispatched through a new KSU-Next prctl
+  syscall hook (`kernelsu/feature/susfs_glue.c`) — KSU-Next has no prctl
+  channel, so the classic `prctl(0xDEADBEEF, CMD_SUSFS_*, ...)` interface was
+  adapted to the Next dispatcher (`ksu_register_syscall_hook`).
+- **Upstream concurrency**: base moved from the ZEPHARO tag (5.15.170) to the
+  maintained `zepharo` branch (5.15.211, 9349 commits ahead): android13-5.15-lts
+  + CLO kernel.lnx.5.15.r1-rel merges, BBRv3 + tcp_plb, Schedhorizon governor,
+  f2fs DIO overwrite optimizations. `.apex-base` + CI updated to the branch.
+- New series patch `apex-walt-scheddebug` (guards `sched_feat_names` refs
+  behind CONFIG_SCHED_DEBUG — required for production SCHED_DEBUG=n).
+- KSU/SUSFS integration is vendored as a new series patch (`apex-root`) so a
+  clean checkout reproduces it.
+
+### Changed
+- Version bumped to `0.4.0-zepharo`.
+- SUSFS 5.4 kernel patch adapted to 5.15 (do_symlinkat/do_linkat take
+  `struct filename *` in 5.15 — no re-getname; 12 hunks fixed manually).
+- `vm_flags_t` include fix in susfs.h (`<linux/mm_types.h>`).
+
+### Security note
+- BBG marks the `u:r:ksu:s0` domain as untrusted — root exists but cannot
+  write protected partitions (boot/dtbo/vbmeta). This is the intended
+  anti-brick posture with root enabled.

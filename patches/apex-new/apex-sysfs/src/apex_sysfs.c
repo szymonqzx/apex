@@ -15,7 +15,7 @@
 #include <linux/sysfs.h>
 #include <linux/string.h>
 
-#define APEX_VERSION "0.3.0-zepharo"
+#define APEX_VERSION "0.4.0-zepharo"
 #define APEX_BASE "5.15.170 Zepharo R9"
 
 static struct kobject *apex_kobj;

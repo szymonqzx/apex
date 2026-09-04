@@ -16,3 +16,12 @@ apex-baseband-guard  Anti-hard-brick partition write protection (LSM)
 # 4. Device-specific driver backports from legacy kernel
 #    Fingerprint, charger ICs, MI thermal, ANT check, battery auth
 apex-device-backports  Topaz device drivers from legacy (fingerprint, chargers, thermal)
+
+# 5. WALT SCHED_DEBUG guard — production builds disable SCHED_DEBUG
+apex-walt-scheddebug  Guard sched_feat_names refs in walt_init() behind CONFIG_SCHED_DEBUG
+
+# 6. Native root (KernelSU-Next) + SUSFS root hiding
+apex-root          KernelSU-Next + SUSFS (path/mount/kstat/maps hiding)
+
+# 7. Base-tree fixes (upstream bugs that break -Werror builds)
+apex-base-fixes     Fix base-tree defects (minidump_log md_align_offset type, ...)

@@ -165,7 +165,7 @@ jobs:
 
       - name: Fetch Zepharo R9 kernel source
         run: |
-          git clone --depth 1 --branch ZEPHARO \
+          git clone --depth 1 --branch zepharo \
             https://github.com/topnotchfreaks/kernel_msm-5.15 kernel
 
       - name: Apply APEX patches

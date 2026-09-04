@@ -5,7 +5,7 @@ The patch series in `apex-new/` is applied to the **Zepharo R9** base tree
 building. The series is ordered by `apex-new/series` and applied by
 `tools/apply-patches.sh` (idempotent).
 
-## Current series (v0.3)
+## Current series (v0.4)
 
 | Patch | Purpose |
 | :--- | :--- |
@@ -13,6 +13,9 @@ building. The series is ordered by `apex-new/series` and applied by
 | `apex-charge` | APEX charge limiting — stops charging at a user-set % by braking the main charger's charge current (`CURRENT_NOW`) through the power_supply framework, re-asserted periodically, with 3% hysteresis |
 | `apex-baseband-guard` | Anti-hard-brick partition protection (LSM). Vendored from `vc-teahouse/Baseband-guard` @ `a54e0dc` (GPL-2.0) with a 5.15-pinned Makefile; registered via `DEFINE_LSM` (own cred blob, no SELinux patching) |
 | `apex-device-backports` | Topaz device drivers ported from the legacy tree: fingerprint (FPC1020, Goodix FOD), NOPMI charger (BQ2589X, SC8551, SM5602, LN8000), battery authentication (DS28E16, onewire GPIO), ANT check, MI thermal interface |
+| `apex-walt-scheddebug` | Guard `sched_feat_names` refs in `walt_init()` behind `CONFIG_SCHED_DEBUG` (required for production `SCHED_DEBUG=n`) |
+| `apex-root` | KernelSU-Next (native root) + SUSFS root hiding (path/mount/kstat/maps hiding, uname spoof, try_umount). SUSFS commands dispatched via a new prctl syscall hook registered with the KSU-Next dispatcher |
+| `apex-base-fixes` | Base-tree defects that break `-Werror` builds (minidump_log type, qrtr/ns kthread_work API, `tcp_current_mss` export for BBRv3) |
 
 Each patch is a directory with an idempotent `apply.sh <kernel-dir>` and its
 sources under `src/` (or `legacy/` for backported drivers — vendored in-tree,
@@ -45,7 +48,9 @@ kernels are **not** reimplemented here:
 
 ## Source references
 
-- Base tree: `topnotchfreaks/kernel_msm-5.15` tag `ZEPHARO` (Linux 5.15.170)
+- Base tree: `topnotchfreaks/kernel_msm-5.15` branch `zepharo` (Linux 5.15.211,
+  incl. android13-5.15-lts + CLO r1-rel merges, BBRv3, Schedhorizon)
+- KernelSU-Next (`KernelSU-Next/KernelSU-Next`) + SUSFS (`simonpunk/susfs4ksu`)
 - Baseband guard: `vc-teahouse/Baseband-guard` @ `a54e0dc` (GPL-2.0)
 - Backported drivers: Xiaomi topaz legacy kernel tree (kernel-5.15.189-legacy)
 

@@ -1,7 +1,7 @@
 # APEX kernel
 
 A hardened, modern custom kernel for the **Redmi Note 12 4G** (topaz / tapas,
-Snapdragon 685 / SM6225-AD), built on the **Zepharo R9** base (Linux 5.15.170,
+Snapdragon 685 / SM6225-AD), built on the **Zepharo zepharo branch** base (Linux 5.15.211,
 CAF msm-5.15). GKI-compatible: kernel Image replaces the ROM's `boot` partition
 while the ROM's ramdisk, DTB, and vendor modules are untouched.
 
@@ -21,6 +21,11 @@ while the ROM's ramdisk, DTB, and vendor modules are untouched.
 - **Baseband guard**: LSM blocking writes to critical partitions
   (boot/vbmeta/dtbo/...) from untrusted processes — anti-hard-brick protection
   (vendored from `vc-teahouse/Baseband-guard`)
+- **Native root + hiding**: KernelSU-Next built in, with SUSFS root hiding
+  (path/mount/kstat/maps spoofing, uname spoof, try_umount)
+- **Upstream concurrency**: tracks the maintained Zepharo `zepharo` branch —
+  5.15.211 with android13-5.15-lts + CLO r1-rel merges, BBRv3 + tcp_plb,
+  Schedhorizon governor, f2fs DIO optimizations
 - **Zero-warning build**: all Clang 22 diagnostics resolved; APEX code is
   checkpatch-clean
 
@@ -42,7 +47,7 @@ docs/                   # Architecture and design docs
 releases/               # Release artifacts (zip + checksum + manifest)
 ```
 
-> `kernel/` is not in git — it is the Zepharo R9 base tree, extracted
+> `kernel/` is not in git — it is the Zepharo zepharo-branch tree, extracted
 > separately. `tools/build-kernel.sh` applies the patch series and syncs the
 > tracked defconfig into it, so a clean checkout reproduces the build.
 
@@ -52,7 +57,8 @@ Requirements: clang 22+, LLVM binutils, `aarch64-linux-gnu-gcc`, `zip`,
 `bc`, `bison`, `flex`, `libssl-dev`, `libelf-dev`, python3 + pytest.
 
 ```bash
-# 1. Extract the Zepharo R9 kernel source to kernel/
+# 1. Fetch the Zepharo zepharo branch to kernel/
+#    (topnotchfreaks/kernel_msm-5.15, branch zepharo — 5.15.211 + CLO/LTS)
 #    (topnotchfreaks/kernel_msm-5.15, tag ZEPHARO)
 
 # 2. Apply the patch series (idempotent)
@@ -136,6 +142,6 @@ creates the git tag `v0.2.1-zepharo`, checksums, and a release manifest in
 
 ## License
 
-GPL-2.0 (see [LICENSE](LICENSE)). The kernel base is Zepharo R9
+GPL-2.0 (see [LICENSE](LICENSE)). The kernel base is the Zepharo zepharo branch (5.15.211)
 (topnotchfreaks/kernel_msm-5.15); device-specific drivers are ported from the
 Xiaomi topaz legacy tree.

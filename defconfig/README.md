@@ -2,8 +2,8 @@
 
 The kernel configuration uses a single hand-crafted `apex_defconfig` as the
 source of truth. This file is tracked in git at `defconfig/apex_defconfig`
-(`kernel/` itself is not in git — it is the Zepharo R9 base tree, extracted
-separately). The build script syncs this file into
+(`kernel/` itself is not in git — it is the Zepharo `zepharo` branch base,
+Linux 5.15.211, fetched separately). The build script syncs this file into
 `kernel/arch/arm64/configs/apex_defconfig` before configuring, so a clean
 checkout builds identically.
 
@@ -50,3 +50,5 @@ python3 tools/check-configs.py
 8. **Debug**: DWARF5 + compressed, function tracer, dynamic ftrace
 9. **Device drivers**: Fingerprint, charger ICs, MI thermal, ANT check, battery auth
 10. **APEX modules**: sysfs control plane + charge control
+11. **Root**: KernelSU-Next (native root) + SUSFS (root hiding)
+12. **Baseband guard**: partition write-protection LSM (CONFIG_BBG)
