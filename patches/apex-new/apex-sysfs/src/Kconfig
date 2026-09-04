@@ -1,0 +1,9 @@
+config APEX_SYSFS
+	tristate "APEX sysfs control plane"
+	default y
+	help
+	  This enables the /sys/class/apex/ sysfs class which provides
+	  a top-level interface for APEX kernel features. All APEX
+	  feature modules register themselves under this class.
+
+	  If unsure, say Y.
