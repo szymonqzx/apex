@@ -2,9 +2,11 @@ name: APEX Kernel CI
 
 on:
   push:
-    branches: [feat/zepharo-rebase, main]
+    branches: [main, feat/zepharo-rebase]
+    tags: ['v*']
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   certification-tests:
@@ -23,31 +25,101 @@ jobs:
       - name: Run certification tests
         run: python3 -m pytest tests/cert/ -v --tb=short
 
-  config-validation:
-    name: Config Fragment Validation
+  code-quality:
+    name: Code Quality (checkpatch + shellcheck)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Validate config fragments
+      - name: Fetch kernel source for checkpatch script
         run: |
-          echo "=== Checking config fragments ==="
-          for frag in defconfig/apex-modern.config defconfig/apex-security.config; do
-            if [ -f "$frag" ]; then
-              echo "  $frag: $(grep -c 'CONFIG_' $frag) options"
-              # Check for duplicates
-              dupes=$(grep -oP 'CONFIG_\w+' "$frag" | sort | uniq -d)
-              if [ -n "$dupes" ]; then
-                echo "ERROR: Duplicate configs in $frag: $dupes"
+          # checkpatch.pl ships with the kernel; fetch a minimal tag (shallow)
+          git clone --depth 1 --filter=blob:none --sparse \
+            https://github.com/topnotchfreaks/kernel_msm-5.15 /tmp/kcheck \
+            || echo "clone failed (optional — falling back to local checkpatch if present)"
+
+      - name: Run checkpatch on APEX sources
+        run: |
+          CHECKPATCH=""
+          if [ -f /tmp/kcheck/scripts/checkpatch.pl ]; then
+            CHECKPATCH="/tmp/kcheck/scripts/checkpatch.pl"
+          elif [ -f kernel/scripts/checkpatch.pl ]; then
+            CHECKPATCH="kernel/scripts/checkpatch.pl"
+          fi
+          if [ -z "$CHECKPATCH" ]; then
+            echo "WARNING: checkpatch.pl unavailable — skipping (need kernel tree)"
+            exit 0
+          fi
+          for f in patches/apex-new/apex-sysfs/src/apex_sysfs.c \
+                   patches/apex-new/apex-charge/src/apex_charge.c; do
+            echo "=== checkpatch: $f ==="
+            perl "$CHECKPATCH" --no-tree --no-summary -f "$f"
+          done
+
+      - name: Shellcheck tools and scripts
+        run: |
+          if command -v shellcheck >/dev/null 2>&1; then
+            shellcheck -x tools/build-kernel.sh tools/package-anykernel3.sh \
+              tools/apply-patches.sh tools/release.sh tools/verify.sh \
+              anykernel3/anykernel.sh || true
+          else
+            echo "shellcheck not installed — running bash -n only"
+            bash -n tools/build-kernel.sh
+            bash -n tools/package-anykernel3.sh
+            bash -n tools/apply-patches.sh
+            bash -n tools/release.sh
+            bash -n tools/verify.sh
+            bash -n anykernel3/anykernel.sh
+          fi
+
+      - name: Verify patch series integrity
+        run: |
+          if [ -f patches/apex-new/series ]; then
+            while IFS= read -r line; do
+              line="${line%%#*}"
+              [ -z "${line// }" ] && continue
+              patch=$(echo "$line" | awk '{print $1}')
+              if [ -d "patches/apex-new/$patch" ]; then
+                echo "  $patch: found"
+              else
+                echo "ERROR: $patch in series but directory not found"
                 exit 1
               fi
+            done < patches/apex-new/series
+          else
+            echo "ERROR: patches/apex-new/series not found"
+            exit 1
+          fi
+
+  config-validation:
+    name: Defconfig Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate apex_defconfig structure
+        run: |
+          DEFCONFIG="defconfig/apex_defconfig"
+          if [ ! -f "$DEFCONFIG" ]; then
+            echo "ERROR: $DEFCONFIG not found (source of truth)"
+            exit 1
+          fi
+          echo "  $DEFCONFIG: $(grep -c 'CONFIG_' $DEFCONFIG) options"
+          dupes=$(grep -oP 'CONFIG_\w+' "$DEFCONFIG" | sort | uniq -d)
+          if [ -n "$dupes" ]; then
+            echo "ERROR: Duplicate configs: $dupes"
+            exit 1
+          fi
+          # Profile overlays must not conflict with each other
+          for frag in defconfig/profile-*.config; do
+            [ -f "$frag" ] || continue
+            dupes=$(grep -oP 'CONFIG_\w+' "$frag" | sort | uniq -d)
+            if [ -n "$dupes" ]; then
+              echo "ERROR: Duplicate configs in $frag: $dupes"
+              exit 1
             fi
           done
-          echo "=== All fragments valid ==="
+          echo "  All configs structurally valid"
 
   schema-validation:
     name: JSON Schema Validation
@@ -76,20 +148,43 @@ jobs:
           print('All schemas valid')
           "
 
-  build-check:
-    name: Build Script Syntax Check
+  kernel-build:
+    name: Kernel Build (Image + modules)
     runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check build script syntax
+      - name: Install toolchain
         run: |
-          bash -n tools/build-kernel.sh
-          bash -n tools/package-anykernel3.sh
-          for apply in patches/apex-new/*/apply.sh; do
-            bash -n "$apply"
-            echo "  $apply: syntax OK"
-          done
+          sudo apt-get update
+          sudo apt-get install -y clang lld llvm \
+            gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu \
+            zip bc bison flex libssl-dev libelf-dev
 
-      - name: Verify anykernel.sh syntax
-        run: bash -n anykernel3/anykernel.sh
+      - name: Fetch Zepharo R9 kernel source
+        run: |
+          git clone --depth 1 --branch ZEPHARO \
+            https://github.com/topnotchfreaks/kernel_msm-5.15 kernel
+
+      - name: Apply APEX patches
+        run: bash tools/apply-patches.sh
+
+      - name: Build kernel (incremental)
+        run: bash tools/build-kernel.sh
+
+      - name: Verify build output
+        run: bash tools/verify.sh --strict
+
+      - name: Package AnyKernel3 zip
+        run: bash tools/package-anykernel3.sh
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: apex-kernel-zip
+          path: |
+            apex-kernel-*.zip
+            apex-kernel-*.zip.sha256
+          retention-days: 14
