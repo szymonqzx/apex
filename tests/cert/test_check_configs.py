@@ -77,12 +77,12 @@ class TestCheckConfigs(unittest.TestCase):
             )
 
     def test_dependency_check_fires_on_missing_dep(self):
-        """If CONFIG_CPU_FREQ_GOV_APEX=y but CONFIG_CPU_FREQ is absent,
+        """If CONFIG_ZRAM=y but CONFIG_ZSMALLOC is absent,
         the dependency check must report an error."""
         merged = {
-            "CONFIG_CPU_FREQ_GOV_APEX": "y",
-            "CONFIG_CPU_FREQ_GOV_COMMON": "y",
-            # CONFIG_CPU_FREQ deliberately missing
+            "CONFIG_ZRAM": "y",
+            "CONFIG_SWAP": "y",
+            # CONFIG_ZSMALLOC deliberately missing
         }
         errors = 0
         for config, deps in self.cc.DEPENDENCIES.items():
@@ -98,8 +98,8 @@ class TestCheckConfigs(unittest.TestCase):
         """If two conflicting configs are both =y, the conflict check
         must report an error."""
         merged = {
-            "CONFIG_CPU_FREQ_DEFAULT_GOV_APEX": "y",
-            "CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL": "y",
+            "CONFIG_PREEMPT": "y",
+            "CONFIG_PREEMPT_NONE": "y",
         }
         errors = 0
         for a, b in self.cc.CONFLICTS:
@@ -134,13 +134,32 @@ CONFIG_DUP=n
         """A minimal clean config set with all deps satisfied should
         produce 0 errors."""
         merged = {
-            "CONFIG_CPU_FREQ": "y",
-            "CONFIG_CPU_FREQ_GOV_COMMON": "y",
-            "CONFIG_CPU_FREQ_GOV_APEX": "y",
             "CONFIG_SMP": "y",
             "CONFIG_SCHED_WALT": "y",
-            "CONFIG_APEX": "y",
-            "CONFIG_APEX_WATCHDOG": "y",
+            "CONFIG_APEX_SYSFS": "y",
+            "CONFIG_SYSFS": "y",
+            "CONFIG_APEX_CHARGE": "y",
+            "CONFIG_POWER_SUPPLY": "y",
+            "CONFIG_ZRAM": "y",
+            "CONFIG_ZSMALLOC": "y",
+            "CONFIG_SWAP": "y",
+            "CONFIG_MMU": "y",
+            "CONFIG_LRU_GEN": "y",
+            "CONFIG_LRU_GEN_ENABLED": "y",
+            "CONFIG_CPU_FREQ": "y",
+            "CONFIG_ARM_QCOM_CPUFREQ_HW": "y",
+            "CONFIG_IOSCHED_BFQ": "y",
+            "CONFIG_BLK_CGROUP": "y",
+            "CONFIG_BFQ_GROUP_IOSCHED": "y",
+            "CONFIG_SECURITY": "y",
+            "CONFIG_SECURITY_LOCKDOWN_LSM": "y",
+            "CONFIG_ARM64": "y",
+            "CONFIG_SHADOW_CALL_STACK": "y",
+            "CONFIG_CC_IS_CLANG": "y",
+            "CONFIG_CFI_CLANG": "y",
+            "CONFIG_LTO_CLANG_THIN": "y",
+            "CONFIG_FAIR_GROUP_SCHED": "y",
+            "CONFIG_UCLAMP_TASK": "y",
         }
         errors = 0
         for config, deps in self.cc.DEPENDENCIES.items():

@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # tools/package-anykernel3.sh — package the APEX kernel into a flashable zip
 # Creates an AnyKernel3-format zip that can be flashed via TWRP/OrangeFox
-# v0.1: bare Zepharo base — Image + modules only, no overlays
+# v0.2: modern stack + security + device drivers + ordered module loading
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APEX="$(cd "$HERE/.." && pwd)"
 OUT="$APEX/out"
 AK3="$APEX/anykernel3"
-VERSION="0.1.0-zepharo"
+VERSION="0.2.0-zepharo"
 ZIP_NAME="apex-kernel-${VERSION}-anykernel3.zip"
 ZIP_DIR="/tmp/apex-ak3-build"
 
@@ -43,13 +43,123 @@ if [ -f "$DTBO" ]; then
   echo "  [OK] dtbo.img copied"
 fi
 
-# 5. Copy modules
+# 5. Copy modules and generate depmod metadata
 MODULE_COUNT=0
 for ko in $(find "$OUT" -name "*.ko" 2>/dev/null); do
   cp "$ko" "$ZIP_DIR/modules/"
   MODULE_COUNT=$((MODULE_COUNT + 1))
 done
 echo "  [INFO] $MODULE_COUNT modules copied"
+
+# Generate modules.dep and related metadata so modprobe works at boot.
+# This is critical — without modules.dep, the init system cannot resolve
+# module dependencies and loading order.
+if [ "$MODULE_COUNT" -gt 0 ]; then
+  echo "  [INFO] Running depmod for module dependency metadata..."
+  # Use the kernel version from the build
+  KVER=$(strings "$OUT/arch/arm64/boot/Image" 2>/dev/null | \
+    grep -oP 'Linux version \K[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+  if [ -z "$KVER" ]; then
+    # Fallback: extract from module filenames
+    KVER=$(basename "$(find "$OUT" -name "*.ko" | head -1)" .ko | \
+      grep -oP '\.\K[0-9]+\.[0-9]+\.[0-9]+.*$' || echo "5.15.170")
+  fi
+
+  # Run depmod against the staged modules directory
+  # -b sets the root directory for the module path
+  # -e checks for unresolved symbols
+  depmod -b "$ZIP_DIR/modules" "$KVER" 2>/dev/null || true
+
+  # If depmod failed (e.g. wrong kver), try a simpler approach
+  if [ ! -f "$ZIP_DIR/modules/modules.dep" ]; then
+    (cd "$ZIP_DIR/modules" && depmod --all 2>/dev/null) || true
+  fi
+
+  if [ -f "$ZIP_DIR/modules/modules.dep" ]; then
+    echo "  [OK] modules.dep generated"
+  else
+    echo "  [WARN] depmod did not produce modules.dep — modprobe may not work"
+  fi
+fi
+
+# 6. Create module load script for ordered loading during boot
+# This script is placed in /vendor/bin/ and called from init.rc
+# It loads critical modules in the correct order before the rest
+# are loaded by the ROM's init system via modprobe.
+cat > "$ZIP_DIR/modules/apex-load-modules.sh" << 'LOADSCRIPT'
+#!/system/bin/sh
+# apex-load-modules.sh — ordered module loading for APEX kernel
+# Called from init.rc on boot to load critical modules in order.
+# Remaining modules are loaded by the ROM's init system via modprobe.
+
+MOD_PATH="/vendor/lib/modules"
+LOG_TAG="apex-modules"
+
+# Critical modules that must load early and in order
+CRITICAL_ORDER="
+sched_walt
+mi_thermal_interface
+tcpm
+bq2589x_charger
+sc8551_charger
+fg_sm5602
+ln8000_charger
+nopmi_charger
+tcpc_rt1711h
+charger_pd_policy
+dual_role_usb_intf
+onewire_gpio
+batt_verify_ds28e16
+ant_check
+ant_check_div
+apex_charge
+"
+
+load_module() {
+  local mod="$1"
+  local ko_file
+
+  # Try modprobe first (uses modules.dep for dependency resolution)
+  if modprobe "$mod" 2>/dev/null; then
+    setprop sys.apex.modules.loaded "$mod" 2>/dev/null
+    return 0
+  fi
+
+  # Fallback: direct insmod
+  ko_file=$(find "$MOD_PATH" -name "${mod}.ko" 2>/dev/null | head -1)
+  if [ -n "$ko_file" ] && [ -f "$ko_file" ]; then
+    insmod "$ko_file" 2>/dev/null && return 0
+  fi
+
+  return 1
+}
+
+# Load critical modules in order
+LOADED=0
+FAILED=0
+for mod in $CRITICAL_ORDER; do
+  if load_module "$mod"; then
+    LOADED=$((LOADED + 1))
+  else
+    FAILED=$((FAILED + 1))
+  fi
+done
+
+# Load remaining modules via modprobe (uses modules.dep for ordering)
+for ko in "$MOD_PATH"/*.ko; do
+  [ -f "$ko" ] || continue
+  modname=$(basename "$ko" .ko)
+  # Skip already-loaded modules
+  if grep -q "^${modname} " /proc/modules 2>/dev/null; then
+    continue
+  fi
+  modprobe "$modname" 2>/dev/null || insmod "$ko" 2>/dev/null
+done
+
+setprop sys.apex.modules.status "loaded:${LOADED}:failed:${FAILED}" 2>/dev/null
+LOADSCRIPT
+chmod 755 "$ZIP_DIR/modules/apex-load-modules.sh"
+echo "  [OK] apex-load-modules.sh created"
 
 # 6. Create the zip
 cd "$ZIP_DIR"

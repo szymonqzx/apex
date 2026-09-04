@@ -4,11 +4,11 @@
 
 ui_print "*******************************************************"
 ui_print " APEX kernel — Redmi Note 12 4G (topaz)"
-ui_print " 5.15.170 Zepharo R9 base (v0.1)"
-ui_print " Bare base — no APEX patches yet"
+ui_print " 5.15.170 Zepharo R9 base (v0.2)"
+ui_print " Modern stack + security + device drivers"
 ui_print "*******************************************************"
 
-kernel.string="APEX kernel v0.1 for topaz (Zepharo R9 base)"
+kernel.string="APEX kernel v0.2 for topaz (Zepharo R9 base)"
 
 do.devicecheck=1
 device.name1=topaz
@@ -34,10 +34,11 @@ split_boot
 # Run official AK3 engine
 . /tmp/anykernel/tools/ak3-core.sh
 
-# --- Post-install: push modules ---
+# --- Post-install: push modules and run depmod ---
 post_install_modules() {
   local MOD_DIR="/tmp/anykernel/modules"
   local VENDOR_MODS="/vendor/lib/modules"
+  local VENDOR_BIN="/vendor/bin"
 
   if [ -d "$MOD_DIR" ]; then
     ui_print "- Installing kernel modules..."
@@ -52,6 +53,28 @@ post_install_modules() {
       count=$((count + 1))
     done
     ui_print "- Installed $count kernel modules"
+
+    # Copy depmod metadata if present
+    for meta in modules.dep modules.alias modules.symbols modules.builtin; do
+      [ -f "$MOD_DIR/$meta" ] && cp "$MOD_DIR/$meta" "$VENDOR_MODS/"
+    done
+
+    # Install the module load script
+    if [ -f "$MOD_DIR/apex-load-modules.sh" ]; then
+      mkdir -p "$VENDOR_BIN"
+      cp "$MOD_DIR/apex-load-modules.sh" "$VENDOR_BIN/"
+      chmod 755 "$VENDOR_BIN/apex-load-modules.sh"
+      ui_print "- Installed apex-load-modules.sh to /vendor/bin/"
+    fi
+
+    # Run depmod on-device if available (fallback if build-time depmod failed)
+    if [ -x /system/bin/depmod ] || [ -x /vendor/bin/depmod ]; then
+      ui_print "- Running depmod..."
+      KVER=$(cat /proc/version 2>/dev/null | grep -oP 'Linux version \K[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+      [ -z "$KVER" ] && KVER="5.15.170"
+      depmod -b / "$KVER" 2>/dev/null || true
+    fi
+
     umount /vendor 2>/dev/null || true
   fi
 }

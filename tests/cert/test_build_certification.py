@@ -24,7 +24,12 @@ class TestBuildCertification(unittest.TestCase):
     def setUpClass(cls):
         cls.image = OUT / "arch" / "arm64" / "boot" / "Image"
         cls.config = OUT / ".config"
-        cls.zip = REPO_ROOT / "apex-kernel-0.1.0-zepharo-anykernel3.zip"
+        # Most recent flashable zip (repo root or releases/ — v0.2 moved them)
+        zips = sorted(
+            list(REPO_ROOT.glob("apex-kernel-*.zip"))
+            + list((REPO_ROOT / "releases").glob("apex-kernel-*.zip"))
+        )
+        cls.zip = zips[-1] if zips else REPO_ROOT / "apex-kernel-0.1.0-zepharo-anykernel3.zip"
 
     def test_kernel_image_exists(self):
         self.assertTrue(self.image.exists(), "Kernel Image not found in out/")

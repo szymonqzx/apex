@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
-"""check-configs.py — verify that the apex defconfig fragments are consistent.
+"""check-configs.py — verify the APEX kernel configuration (v0.2+).
+
+The single source of truth is defconfig/apex_defconfig. Optional
+profile overlays (defconfig/profile-*.config) are applied on top.
 
 Checks:
-  1. No conflicting CONFIG options (both =y and =n in different fragments)
-  2. All dependencies are satisfied (e.g., CPU_FREQ_GOV_APEX depends on CPU_FREQ)
-  3. No duplicate CONFIG options within the same fragment
-  4. Required configs that must be =y (not =m or =n)
-  5. Configs that must be =n (security risks)
-  6. version.config presence
-  7. Feature summary
+  1. defconfig/apex_defconfig exists and has no duplicate CONFIG options
+  2. Profile overlays have no internal duplicates and no key overlap with
+     each other (they are mutually exclusive)
+  3. Key dependencies are satisfied (e.g. CONFIG_SCHED_WALT needs CONFIG_SMP)
+  4. Required configs are =y, forbidden configs are =n
+  5. Feature summary for the merged configuration
 
 Usage:
   python3 check-configs.py [--verbose]
@@ -21,167 +23,161 @@ from pathlib import Path
 
 APEX = Path(__file__).parent.parent
 DEFCONFIG_DIR = APEX / "defconfig"
+DEFCONFIG = DEFCONFIG_DIR / "apex_defconfig"
 
-# Known dependency rules — keys and deps use the CONFIG_ prefix to match
-# the form stored by parse_config().  The bare-name form used previously
-# never matched the merged dict, making the entire dependency check dead.
+# Dependencies — key must be =y, deps must be =y or =m.
 DEPENDENCIES = {
-    "CONFIG_CPU_FREQ_GOV_APEX": ["CONFIG_CPU_FREQ", "CONFIG_CPU_FREQ_GOV_COMMON"],
-    "CONFIG_CPU_FREQ_GOV_SCHEDUTIL": ["CONFIG_CPU_FREQ"],
     "CONFIG_SCHED_WALT": ["CONFIG_SMP"],
-    "CONFIG_SCHED_CASS": [],
-    "CONFIG_APEX": [],
-    "CONFIG_APEX_WATCHDOG": ["CONFIG_APEX"],
-    "CONFIG_APEX_IMMORTAL": ["CONFIG_APEX"],
-    "CONFIG_APEX_USB_AUTOLOAD": ["CONFIG_USB"],
-    "CONFIG_APEX_KCAL": ["CONFIG_FB"],
-    "CONFIG_APEX_SIMPLE_LMK": [],
-    "CONFIG_APEX_MEMFREQ": ["CONFIG_DEVFREQ", "CONFIG_INTERCONNECT"],
+    "CONFIG_APEX_SYSFS": ["CONFIG_SYSFS"],
+    "CONFIG_APEX_CHARGE": ["CONFIG_APEX_SYSFS", "CONFIG_POWER_SUPPLY"],
+    "CONFIG_ZRAM": ["CONFIG_ZSMALLOC", "CONFIG_SWAP"],
     "CONFIG_ZRAM_WRITEBACK": ["CONFIG_ZRAM"],
     "CONFIG_KSM": ["CONFIG_MMU"],
     "CONFIG_CFI_CLANG": ["CONFIG_CC_IS_CLANG"],
     "CONFIG_LTO_CLANG_THIN": ["CONFIG_CC_IS_CLANG"],
-    "CONFIG_WIREGUARD": [],
-    "CONFIG_EXFAT_FS": [],
-    "CONFIG_NTFS3_FS": [],
-    "CONFIG_LRU_GEN": [],
-    "CONFIG_WQ_POWER_EFFICIENT": [],
-    "CONFIG_RCU_LAZY": [],
-    "CONFIG_NET_SCH_FQ": [],
-    "CONFIG_TCP_CONG_BBR": [],
-    "CONFIG_TCP_CONG_WESTWOOD": [],
+    "CONFIG_LRU_GEN": ["CONFIG_MMU"],
+    "CONFIG_LRU_GEN_ENABLED": ["CONFIG_LRU_GEN"],
+    "CONFIG_CPU_FREQ_GOV_SCHEDUTIL": ["CONFIG_CPU_FREQ"],
+    "CONFIG_ARM_QCOM_CPUFREQ_HW": ["CONFIG_CPU_FREQ"],
+    "CONFIG_UCLAMP_TASK": ["CONFIG_FAIR_GROUP_SCHED"],
+    "CONFIG_BFQ_GROUP_IOSCHED": ["CONFIG_IOSCHED_BFQ", "CONFIG_BLK_CGROUP"],
+    "CONFIG_SECURITY_LOCKDOWN_LSM": ["CONFIG_SECURITY"],
+    "CONFIG_SHADOW_CALL_STACK": ["CONFIG_ARM64"],
+    "CONFIG_SCHED_CONSERVATIVE_BOOST_LPM_BIAS": ["CONFIG_SCHED_WALT"],
 }
 
-# Known conflicts (can't both be default governor)
+# Mutually exclusive pairs (only one may be =y)
 CONFLICTS = [
-    ("CONFIG_CPU_FREQ_DEFAULT_GOV_APEX", "CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL"),
-    ("CONFIG_CPU_FREQ_DEFAULT_GOV_APEX", "CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE"),
     ("CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL", "CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE"),
+    ("CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL", "CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND"),
     ("CONFIG_TRANSPARENT_HUGEPAGE_ALWAYS", "CONFIG_TRANSPARENT_HUGEPAGE_MADVISE"),
+    ("CONFIG_PREEMPT", "CONFIG_PREEMPT_NONE"),
+    ("CONFIG_PREEMPT", "CONFIG_PREEMPT_VOLUNTARY"),
 ]
 
-# Configs that must be =y (built-in, not module)
+# Must be built-in (=y)
 REQUIRED_Y = [
-    "CONFIG_PREEMPT",
     "CONFIG_CPU_FREQ",
-    "CONFIG_CPU_FREQ_GOV_COMMON",
+    "CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL",
+    "CONFIG_CPU_FREQ_GOV_SCHEDUTIL",
+    "CONFIG_SCHED_WALT",          # built-in for EAS from boot
+    "CONFIG_ENERGY_MODEL",
+    "CONFIG_APEX_SYSFS",
+    "CONFIG_ZSMALLOC",            # built-in so ZRAM can be =y
+    "CONFIG_ZRAM",                # built-in — essential at boot
+    "CONFIG_CFI_CLANG",
+    "CONFIG_SHADOW_CALL_STACK",
+    "CONFIG_SECURITY_LOCKDOWN_LSM",
+    "CONFIG_STACKPROTECTOR_STRONG",
+    "CONFIG_SLAB_FREELIST_HARDENED",
 ]
 
-# Configs that must be disabled (=n)
+# Must be disabled (=n)
 REQUIRED_N = [
     "CONFIG_USERFAULTFD",
+    "CONFIG_HIBERNATION",
+    "CONFIG_KEXEC",
+    "CONFIG_KEXEC_FILE",
     "CONFIG_DEBUG_KMEMLEAK",
+    "CONFIG_DEVMEM",
+    "CONFIG_SECURITY_SELINUX_DEVELOP",
 ]
 
-# Feature groups for summary
+# Feature groups for the summary (checked against merged config)
 FEATURE_GROUPS = {
-    "governor": ["CONFIG_CPU_FREQ_GOV_APEX", "CONFIG_CPU_FREQ_DEFAULT_GOV_APEX"],
-    "scheduler": ["CONFIG_SCHED_WALT", "CONFIG_SCHED_CASS", "CONFIG_PREEMPT",
-                  "CONFIG_WQ_POWER_EFFICIENT", "CONFIG_RCU_LAZY"],
-    "root": ["CONFIG_KSU", "CONFIG_KSU_SUSFS"],
+    "scheduler": ["CONFIG_SCHED_WALT", "CONFIG_PREEMPT", "CONFIG_UCLAMP_TASK",
+                  "CONFIG_SCHED_CONSERVATIVE_BOOST_LPM_BIAS"],
+    "memory": ["CONFIG_LRU_GEN", "CONFIG_LRU_GEN_ENABLED", "CONFIG_KSM",
+               "CONFIG_ZRAM", "CONFIG_ZRAM_DEF_COMP_ZSTD", "CONFIG_ZRAM_WRITEBACK"],
+    "cpufreq": ["CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL", "CONFIG_ARM_QCOM_CPUFREQ_HW"],
+    "io": ["CONFIG_IOSCHED_BFQ", "CONFIG_MQ_IOSCHED_DEADLINE", "CONFIG_BFQ_GROUP_IOSCHED"],
     "hardening": ["CONFIG_CFI_CLANG", "CONFIG_RANDOMIZE_BASE",
-                  "CONFIG_STACKPROTECTOR_STRONG", "CONFIG_FORTIFY_SOURCE"],
-    "pentest": ["CONFIG_APEX_USB_AUTOLOAD", "CONFIG_WIREGUARD"],
-    "zram": ["CONFIG_ZRAM", "CONFIG_ZRAM_DEF_COMP_ZSTD",
-             "CONFIG_ZRAM_WRITEBACK", "CONFIG_LRU_GEN"],
-    "networking": ["CONFIG_TCP_CONG_BBR", "CONFIG_TCP_CONG_WESTWOOD",
-                   "CONFIG_NET_SCH_FQ"],
-    "filesystems": ["CONFIG_EXFAT_FS", "CONFIG_NTFS3_FS"],
-    "display": ["CONFIG_APEX_KCAL"],
-    "toolchain": ["CONFIG_LTO_CLANG_THIN", "CONFIG_BPF_JIT_ALWAYS_ON"],
-    "memory": ["CONFIG_APEX_SIMPLE_LMK", "CONFIG_APEX_MEMFREQ",
-               "CONFIG_KSM", "CONFIG_MEMCG"],
+                  "CONFIG_STACKPROTECTOR_STRONG", "CONFIG_SHADOW_CALL_STACK",
+                  "CONFIG_SECURITY_LOCKDOWN_LSM", "CONFIG_SLAB_FREELIST_HARDENED"],
+    "networking": ["CONFIG_TCP_CONG_BBR", "CONFIG_WIREGUARD", "CONFIG_NET_SCH_FQ"],
+    "power": ["CONFIG_CPU_IDLE_GOV_QCOM_LPM", "CONFIG_SUSPEND"],
+    "thermal": ["CONFIG_THERMAL", "CONFIG_MI_THERMAL_INTERFACE",
+                "CONFIG_SCHED_THERMAL_PRESSURE"],
+    "apex": ["CONFIG_APEX_SYSFS", "CONFIG_APEX_CHARGE"],
+    "device": ["CONFIG_INPUT_FINGERPRINT", "CONFIG_NOPMI_CHARGER",
+               "CONFIG_ANT_CHECK", "CONFIG_BATT_VERIFY_BY_DS28E16"],
+    "toolchain": ["CONFIG_LTO_CLANG_THIN", "CONFIG_BPF_JIT_ALWAYS_ON",
+                  "CONFIG_DEBUG_INFO_DWARF5"],
 }
 
 
 def parse_config(path):
-    """Parse a .config fragment file, return dict of CONFIG_X -> value."""
+    """Parse a .config-style file; return {CONFIG_X: value}. Warn on dupes."""
     configs = {}
-    with open(path) as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith("#"):
-                # Check for "# CONFIG_X is not set"
-                m = re.match(r"#\s+(CONFIG_\w+)\s+is not set", line)
-                if m:
-                    configs[m.group(1)] = "n"
-                continue
-            m = re.match(r"(CONFIG_\w+)=(\w+)", line)
+    for line in path.read_text().splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        if line.startswith("#"):
+            m = re.match(r"#\s+(CONFIG_\w+)\s+is not set", line)
             if m:
                 key = m.group(1)
-                val = m.group(2)
                 if key in configs:
-                    print(
-                        f"  WARN: {path.name}: duplicate {key}={configs[key]} -> {val}"
-                    )
-                configs[key] = val
+                    print(f"  WARN: {path.name}: duplicate {key}")
+                configs[key] = "n"
+            continue
+        m = re.match(r"(CONFIG_\w+)=(\w+)", line)
+        if m:
+            key, val = m.group(1), m.group(2)
+            if key in configs:
+                print(f"  WARN: {path.name}: duplicate {key}={configs[key]} -> {val}")
+            configs[key] = val
     return configs
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Verify apex defconfig fragment consistency")
-    parser.add_argument("--verbose", "-v", action="store_true",
-                        help="Show detailed output for each check")
+        description="Verify APEX kernel configuration consistency")
+    parser.add_argument("--verbose", "-v", action="store_true")
     args = parser.parse_args()
 
-    all_configs = {}
     errors = 0
     warnings = 0
 
-    # Check for version.config presence
-    version_config = DEFCONFIG_DIR / "version.config"
-    if not version_config.exists():
-        print("  ERROR: version.config not found in defconfig/")
-        errors += 1
-    else:
-        if args.verbose:
-            print("  [OK] version.config present")
+    # --- 1. Source of truth ------------------------------------------------
+    if not DEFCONFIG.exists():
+        print(f"  ERROR: {DEFCONFIG} not found — source of truth is untracked")
+        return 1
+    base = parse_config(DEFCONFIG)
+    print(f"  [OK] defconfig/apex_defconfig: {len(base)} options")
 
-    # Parse all fragments (exclude profile-*.config — they are mutually exclusive
-# and only one is applied per build, so they intentionally conflict with each other)
-    for frag in sorted(DEFCONFIG_DIR.glob("*.config")):
-        if frag.name.startswith("profile-"):
-            continue
-        configs = parse_config(frag)
-        all_configs[frag.name] = configs
-        if args.verbose:
-            print(f"  {frag.name}: {len(configs)} options")
+    # --- 2. Profile overlays -----------------------------------------------
+    # Compile-time profiles were removed in v0.2.1 — profile switching is
+    # runtime-only via rom-overlays/init.d/apex_profiles.rc. Warn if stale
+    # profile-*.config files reappear.
+    profiles = {}
+    for frag in sorted(DEFCONFIG_DIR.glob("profile-*.config")):
+        profiles[frag.name] = parse_config(frag)
+        print(f"  WARN: {frag.name} is a stale compile-time profile — removed in v0.2.1")
+        warnings += 1
 
-    # Merge all configs
-    merged = {}
-    for frag_name, configs in all_configs.items():
-        for key, val in configs.items():
-            if key in merged and merged[key] != val:
-                print(
-                    f"  CONFLICT: {key}={merged[key]} (earlier) vs "
-                    f"{key}={val} (in {frag_name})"
-                )
-                errors += 1
-            merged[key] = val
+    # --- 3. Merge (base + any stale profiles) for dependency checks --------
+    merged = dict(base)
 
-    # Check dependencies
+    # --- 4. Dependencies ---------------------------------------------------
     for config, deps in DEPENDENCIES.items():
-        if config in merged and merged[config] == "y":
+        if merged.get(config) == "y":
             for dep in deps:
-                if dep not in merged or merged[dep] not in ("y", "m"):
-                    print(
-                        f"  MISSING DEP: {config}=y requires {dep}, "
-                        f"which is not enabled"
-                    )
+                if merged.get(dep) not in ("y", "m"):
+                    print(f"  MISSING DEP: {config}=y requires {dep}, not enabled")
                     errors += 1
 
-    # Check conflicts
+    # --- 5. Conflicts ------------------------------------------------------
     for a, b in CONFLICTS:
         if merged.get(a) == "y" and merged.get(b) == "y":
             print(f"  CONFLICT: {a}=y and {b}=y cannot both be set")
             errors += 1
 
-    # Check required =y configs
+    # --- 6. Required =y ----------------------------------------------------
     for config in REQUIRED_Y:
         val = merged.get(config)
         if val is None:
-            print(f"  MISSING: {config} not set in any fragment (must be =y)")
+            print(f"  MISSING: {config} not set (must be =y)")
             errors += 1
         elif val != "y":
             print(f"  ERROR: {config}={val} but must be =y")
@@ -189,22 +185,21 @@ def main():
         elif args.verbose:
             print(f"  [OK] {config}=y")
 
-    # Check required =n configs
+    # --- 7. Required =n ----------------------------------------------------
     for config in REQUIRED_N:
         val = merged.get(config)
-        if val == "y":
-            print(f"  WARN: {config}=y should be disabled (=n)")
-            warnings += 1
-        elif val == "m":
-            print(f"  WARN: {config}=m should be disabled (=n)")
+        if val in ("y", "m"):
+            print(f"  WARN: {config}={val} should be disabled")
             warnings += 1
         elif args.verbose and val == "n":
             print(f"  [OK] {config}=n (disabled)")
 
-    # USERFAULTFD is already checked above via REQUIRED_N with the CONFIG_ prefix.
-    # The previous bare-name check was dead because merged keys always carry CONFIG_.
+    # BPF unprivileged must be OFF (this config is =y when default is off)
+    if merged.get("CONFIG_BPF_UNPRIV_DEFAULT_OFF") != "y":
+        print("  WARN: CONFIG_BPF_UNPRIV_DEFAULT_OFF != y (unprivileged BPF enabled)")
+        warnings += 1
 
-    # Feature summary
+    # --- 8. Feature summary ------------------------------------------------
     print("\n  --- Feature Summary ---")
     for feature, configs in FEATURE_GROUPS.items():
         enabled = []
