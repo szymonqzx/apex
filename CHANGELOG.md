@@ -159,3 +159,30 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 - BBG marks the `u:r:ksu:s0` domain as untrusted — root exists but cannot
   write protected partitions (boot/dtbo/vbmeta). This is the intended
   anti-brick posture with root enabled.
+
+## [0.4.1-zepharo] — planned
+
+### Changed (device tuning — SM6225-AD)
+- **HZ 250 → 300** (Zephyr-lineage tickrate, aligned with the 120 Hz display).
+- **-O3** via `CC_OPTIMIZE_FOR_PERFORMANCE_O3` (un-ARC-gated in
+  `apex-base-fixes`) — the ChicKernel-proven optimization level for this SoC.
+- **Schedhorizon is now the DEFAULT governor** (topaz-proven; schedutil fork
+  with efficient_freq + up_delay tunables; EAS-compatible).
+- **SSG (Samsung Generic) I/O scheduler** enabled and made the DEFAULT
+  (ChicKernel/SSG-proven for UFS), BFQ kept available with cgroups.
+- **DAMON + DAMON_RECLAIM** (proactive reclaim for 4 GB devices), F2FS
+  unfair-rwsem, EROFS pcpu kthreads (hi-pri), RT softint optimization,
+  RCU_FAST_NO_HZ + RCU_NOCB_CPU, GKI_HACKS_TO_FIX (hidden vendor-module
+  configs), Kprofiles framework (kp_mode 0-3 sysfs).
+- **apex_profiles.rc rewritten** against the shipped v0.4 kernel surface:
+  schedhorizon rate limits, WALT up/downmigrate sysctls, KGSL GPU caps
+  (Adreno 610, 1260 MHz stock), APEX charge limit node. Removed dead
+  /proc/apex/* and /proc/apex_charge/* paths.
+- check-configs gains a `tuning` feature group + validates the new
+  required options.
+
+### Notes
+- Research basis: ChicKernel stable-7 defconfig (cloned directly) + zepharo
+  branch unified_defconfig. Not adopted (security): KASAN, USERFAULTFD,
+  KALLSYMS_ALL, PANIC_ON_OOPS, DEFAULT_GOV_PERFORMANCE, Boeffla/CASS/Polly
+  (not in the zepharo branch). Nebula kernel is for veux/peux, NOT topaz.

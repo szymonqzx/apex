@@ -1,103 +1,68 @@
 # apex_profiles.rc — installed at /vendor/etc/init/apex_profiles.rc
-# Three-switchable-profile system: Battery / Balanced / Performance
-# Inspired by the "profiles, not a single compromise point" design philosophy.
+# Profile switching for the APEX kernel (Redmi Note 12 4G, SM6225-AD)
 #
-# Switching is done via property: apex.profile=battery|balanced|performance
-# The apex state machine reads this and adjusts:
-#   - CPU governor ramp rates (up_rate_limit_us / down_rate_limit_us)
-#   - WALT upmigrate/downmigrate thresholds
-#   - GPU max clock and bus DCVS profile
-#   - Thermal trip points (sustained-perf only, skin-temp untouched)
-#   - Charging concurrency throttle
-#   - Charge limit default
+# Switching: setprop apex.profile battery|balanced|performance
 #
-# NOTE: Some of these (thermal trip tables, default OPP ceilings) are
-# compile-time in downstream Qualcomm trees. For those, we ship three
-# separate AnyKernel3 zips (battery/balanced/performance) with different
-# defconfig fragments. The runtime switch below handles everything that
-# CAN be changed at runtime via sysfs.
+# Tuned for the shipped v0.4 kernel:
+#   - default governor: schedhorizon (EAS-compatible schedutil fork)
+#   - WALT load tracking (sysctls under /proc/sys/kernel/sched_*)
+#   - Adreno 610 GPU (stock ceiling 1260 MHz)
+#   - APEX charge limiting via /sys/class/apex/charge/
+#
+# The dead /proc/apex/* and /proc/apex_charge/* surfaces from older plans
+# are GONE — do not write them.
 
 # === Battery profile ===
+# Slow to climb, quick to fall back; bursts stay on the A53 cluster;
+# GPU capped ~85% of stock; charge limit 80%.
 on property:apex.profile=battery
-    # CPU: slow to climb, quick to fall back
-    write /sys/devices/system/cpu/cpufreq/policy0/schedutil/up_rate_limit_us 30000
-    write /sys/devices/system/cpu/cpufreq/policy0/schedutil/down_rate_limit_us 5000
-    write /sys/devices/system/cpu/cpufreq/policy4/schedutil/up_rate_limit_us 40000
-    write /sys/devices/system/cpu/cpufreq/policy4/schedutil/down_rate_limit_us 5000
+    # CPU governor (schedhorizon): conservative ramp on big cluster
+    write /sys/devices/system/cpu/cpufreq/policy0/schedhorizon/up_rate_limit_us 30000
+    write /sys/devices/system/cpu/cpufreq/policy0/schedhorizon/down_rate_limit_us 5000
+    write /sys/devices/system/cpu/cpufreq/policy4/schedhorizon/up_rate_limit_us 40000
+    write /sys/devices/system/cpu/cpufreq/policy4/schedhorizon/down_rate_limit_us 5000
     # WALT: raise upmigrate threshold so small bursts stay on A53
     write /proc/sys/kernel/sched_upmigrate 95
     write /proc/sys/kernel/sched_downmigrate 80
-    # GPU: cap max clock ~85% of stock (Adreno 610 stock ~1260MHz → cap ~1071MHz)
+    # GPU: cap max clock ~85% of stock (1260 MHz -> ~1071 MHz)
     write /sys/class/kgsl/kgsl-3d0/max_gpuclk 1071000000
     write /sys/class/kgsl/kgsl-3d0/devfreq/max_freq 1071000000
-    # Thermal: stock trip points (no relaxation)
-    write /sys/class/thermal/thermal_zone0/trip_point_1_temp 55000
-    # Charge limit: 80% default for battery health
-    write /sys/class/power_supply/battery/charge_limit 80
-    # APEX Charge Manager: eco mode (10W, minimal heat, best for overnight)
-    write /proc/apex_charge/charge_mode 3
-    write /proc/apex_charge/charge_limit_percent 80
-    # Notify kernel state machine
-    write /proc/apex/policy "profile battery"
+    # Charge limit: 80% for battery health
+    write /sys/class/apex/charge/charge_limit_percent 80
+    setprop sys.apex.profile.active battery
 
 # === Balanced profile (default) ===
+# Vendor-like ramp, stock GPU, 90% charge limit.
 on property:apex.profile=balanced
-    # CPU: vendor default, nudged toward faster-down
-    write /sys/devices/system/cpu/cpufreq/policy0/schedutil/up_rate_limit_us 10000
-    write /sys/devices/system/cpu/cpufreq/policy0/schedutil/down_rate_limit_us 8000
-    write /sys/devices/system/cpu/cpufreq/policy4/schedutil/up_rate_limit_us 10000
-    write /sys/devices/system/cpu/cpufreq/policy4/schedutil/down_rate_limit_us 8000
+    # CPU: moderate ramp, faster-down
+    write /sys/devices/system/cpu/cpufreq/policy0/schedhorizon/up_rate_limit_us 10000
+    write /sys/devices/system/cpu/cpufreq/policy0/schedhorizon/down_rate_limit_us 8000
+    write /sys/devices/system/cpu/cpufreq/policy4/schedhorizon/up_rate_limit_us 10000
+    write /sys/devices/system/cpu/cpufreq/policy4/schedhorizon/down_rate_limit_us 8000
     # WALT: stock upmigrate/downmigrate
     write /proc/sys/kernel/sched_upmigrate 90
     write /proc/sys/kernel/sched_downmigrate 75
     # GPU: stock clock
     write /sys/class/kgsl/kgsl-3d0/max_gpuclk 1260000000
     write /sys/class/kgsl/kgsl-3d0/devfreq/max_freq 1260000000
-    # Thermal: stock trip points
-    write /sys/class/thermal/thermal_zone0/trip_point_1_temp 55000
-    # Charge limit: 90% default
-    write /sys/class/power_supply/battery/charge_limit 90
-    # APEX Charge Manager: balanced mode (18W, moderate heat)
-    write /proc/apex_charge/charge_mode 2
-    write /proc/apex_charge/charge_limit_percent 90
-    # Notify kernel state machine
-    write /proc/apex/policy "profile balanced"
+    # Charge limit: 90%
+    write /sys/class/apex/charge/charge_limit_percent 90
+    setprop sys.apex.profile.active balanced
 
 # === Performance profile ===
+# Fast ramp, stock GPU, no charge limit.
 on property:apex.profile=performance
-    # CPU: fast ramp-up, relaxed ramp-down
-    write /sys/devices/system/cpu/cpufreq/policy0/schedutil/up_rate_limit_us 1000
-    write /sys/devices/system/cpu/cpufreq/policy0/schedutil/down_rate_limit_us 20000
-    write /sys/devices/system/cpu/cpufreq/policy4/schedutil/up_rate_limit_us 1500
-    write /sys/devices/system/cpu/cpufreq/policy4/schedutil/down_rate_limit_us 20000
-    # WALT: lower upmigrate so tasks move to A73 faster
+    # CPU: quick to climb
+    write /sys/devices/system/cpu/cpufreq/policy0/schedhorizon/up_rate_limit_us 5000
+    write /sys/devices/system/cpu/cpufreq/policy0/schedhorizon/down_rate_limit_us 10000
+    write /sys/devices/system/cpu/cpufreq/policy4/schedhorizon/up_rate_limit_us 5000
+    write /sys/devices/system/cpu/cpufreq/policy4/schedhorizon/down_rate_limit_us 10000
+    # WALT: lower upmigrate threshold so big cluster engages sooner
     write /proc/sys/kernel/sched_upmigrate 85
     write /proc/sys/kernel/sched_downmigrate 70
-    # GPU: stock clock (no cap)
+    # GPU: stock ceiling (no cap)
     write /sys/class/kgsl/kgsl-3d0/max_gpuclk 1260000000
     write /sys/class/kgsl/kgsl-3d0/devfreq/max_freq 1260000000
-    # Thermal: raise sustained-perf trip +5°C (skin-temp trip UNTOUCHED)
-    write /sys/class/thermal/thermal_zone0/trip_point_1_temp 60000
-    # Charge limit: 100% (opt-in, user accepts heat)
-    write /sys/class/power_supply/battery/charge_limit 100
-    # APEX Charge Manager: fast mode (33W, max speed)
-    write /proc/apex_charge/charge_mode 1
-    write /proc/apex_charge/charge_limit_percent 0
-    # Notify kernel state machine
-    write /proc/apex/policy "profile performance"
-
-# === Charging concurrency throttle ===
-# When charging, throttle more aggressively across ALL profiles
-# (SoC heat + charging heat = main driver of long-term cell wear)
-on property:apex.charging=1
-    # Drop thermal trip by 5°C while charging
-    write /sys/class/thermal/thermal_zone0/trip_point_1_temp 50000
-
-on property:apex.charging=0
-    # Restore profile-appropriate trip point
-    exec - root -- /system/bin/sh -c "PROFILE=$(getprop apex.profile); case \"$PROFILE\" in battery) echo 55000 > /sys/class/thermal/thermal_zone0/trip_point_1_temp;; performance) echo 60000 > /sys/class/thermal/thermal_zone0/trip_point_1_temp;; *) echo 55000 > /sys/class/thermal/thermal_zone0/trip_point_1_temp;; esac"
-
-# === Default profile at boot ===
-on property:sys.boot_completed=1
-    # Set default profile to balanced
-    setprop apex.profile balanced
+    # Charge limit: disabled
+    write /sys/class/apex/charge/charge_limit_percent 0
+    setprop sys.apex.profile.active performance

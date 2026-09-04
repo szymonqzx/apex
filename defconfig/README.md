@@ -41,14 +41,17 @@ python3 tools/check-configs.py
 ## Key features in apex_defconfig
 
 1. **ThinLTO**: Clang ThinLTO with LLD for smaller binary and faster boot
-2. **Scheduler**: WALT (built-in) + EAS + UCLAMP + PREEMPT + HZ=250
-3. **ZRAM**: built-in, ZSTD compression + writeback
-4. **TCP**: BBR congestion control (module), cubic default
-5. **Security**: CFI, KASLR, Shadow Call Stack, SLAB hardening, lockdown LSM
-6. **I/O**: BFQ + MQ_DEADLINE for low-latency UFS
-7. **BPF**: JIT always on, unprivileged BPF disabled
-8. **Debug**: DWARF5 + compressed, function tracer, dynamic ftrace
-9. **Device drivers**: Fingerprint, charger ICs, MI thermal, ANT check, battery auth
-10. **APEX modules**: sysfs control plane + charge control
-11. **Root**: KernelSU-Next (native root) + SUSFS (root hiding)
-12. **Baseband guard**: partition write-protection LSM (CONFIG_BBG)
+2. **Compiler**: -O3 (`CC_OPTIMIZE_FOR_PERFORMANCE_O3`, un-ARC-gated) — the
+   ChicKernel-proven optimization level for this SoC
+3. **Scheduler**: WALT (built-in) + EAS + UCLAMP + PREEMPT + HZ=300
+   (120 Hz-display aligned), Schedhorizon as the DEFAULT governor
+4. **ZRAM**: built-in, ZSTD compression + writeback
+5. **TCP**: BBR congestion control (module), cubic default
+6. **Security**: CFI, KASLR, Shadow Call Stack, SLAB hardening, lockdown LSM
+7. **I/O**: SSG (Samsung Generic) as the DEFAULT scheduler + BFQ available
+8. **BPF**: JIT always on, unprivileged BPF disabled
+9. **Debug**: DWARF5 + compressed, function tracer, dynamic ftrace
+10. **Device drivers**: Fingerprint, charger ICs, MI thermal, ANT check, battery auth
+11. **APEX modules**: sysfs control plane + charge control
+12. **Root**: KernelSU-Next (native root) + SUSFS (root hiding)
+13. **Baseband guard**: partition write-protection LSM (CONFIG_BBG)

@@ -75,4 +75,25 @@ PYEOF3
   echo "  apex-base-fixes: tcp_current_mss export"
 fi
 
+# 4. init/Kconfig: CC_OPTIMIZE_FOR_PERFORMANCE_O3 is ARC-gated upstream; the
+#    -O3 level is safe on arm64 (ChicKernel ships it) — drop the ARC dep.
+F="$KERNEL/init/Kconfig"
+if grep -q 'config CC_OPTIMIZE_FOR_PERFORMANCE_O3' "$F" && \
+   grep -A2 'config CC_OPTIMIZE_FOR_PERFORMANCE_O3' "$F" | grep -q 'depends on ARC'; then
+  python3 - "$F" << 'PYEOF4'
+import sys
+p = sys.argv[1]
+s = open(p).read()
+old = """config CC_OPTIMIZE_FOR_PERFORMANCE_O3
+	bool "Optimize more for performance (-O3)"
+	depends on ARC"""
+new = """config CC_OPTIMIZE_FOR_PERFORMANCE_O3
+	bool "Optimize more for performance (-O3)"""
+if old in s:
+    s = s.replace(old, new, 1)
+open(p, 'w').write(s)
+PYEOF4
+  echo "  apex-base-fixes: CC_OPTIMIZE_FOR_PERFORMANCE_O3 un-ARC-gated"
+fi
+
 echo "  apex-base-fixes: done"
