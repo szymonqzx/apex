@@ -1,0 +1,31 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "APEX Capability Profile",
+  "description": "Generated, hashed, approved capability profile with field-level provenance",
+  "type": "object",
+  "required": ["schema_version", "device", "topology", "fields", "profile_hash"],
+  "properties": {
+    "schema_version": {"type": "string", "enum": ["1.0"]},
+    "profile_id": {"type": "string"},
+    "device": {"type": "string"},
+    "topology": {"type": "string"},
+    "fields": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "value", "provenance", "source"],
+        "properties": {
+          "name": {"type": "string"},
+          "value": {},
+          "provenance": {"type": "string", "enum": ["observed", "stock-derived", "manual"]},
+          "source": {"type": "string"},
+          "approved": {"type": "boolean"}
+        }
+      }
+    },
+    "profile_hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "approved": {"type": "boolean"},
+    "approved_by": {"type": "string"},
+    "approved_at": {"type": "string"}
+  }
+}

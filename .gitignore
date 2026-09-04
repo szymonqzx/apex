@@ -21,3 +21,5 @@ chroot/rootfs/rootfs/
 # Local-only
 .env
 *.local
+kernel-5.15.189-legacy/
+patches/quarantine/

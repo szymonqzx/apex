@@ -55,15 +55,15 @@ static int blx_find_backlight(struct notifier_block *nb,
 {
 	struct backlight_device *bd = data;
 
-	if (event != BL_EVENT_REGISTERED)
+	if (event != BACKLIGHT_REGISTERED)
 		return NOTIFY_DONE;
 
 	/* Prefer the panel backlight (skip keyboard/led backlights) */
-	if (!blx_bl_dev && (strstr(bd->props.name, "panel") ||
-			    strstr(bd->props.name, "lcd") ||
-			    strstr(bd->props.name, "mdss"))) {
+	if (!blx_bl_dev && (strstr(dev_name(&bd->dev), "panel") ||
+			    strstr(dev_name(&bd->dev), "lcd") ||
+			    strstr(dev_name(&bd->dev), "mdss"))) {
 		blx_bl_dev = bd;
-		pr_info("bound to backlight device: %s\n", bd->props.name);
+		pr_info("bound to backlight device: %s\n", dev_name(&bd->dev));
 	}
 
 	return NOTIFY_DONE;

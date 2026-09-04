@@ -1,0 +1,23 @@
+*** Begin Patch
+*** Update File: patches/device-backports/README.md
+@@
+ | `kmsg-spam-suppress.patch` | Suppress vendor module kmsg spam | community |
+ |
++## Module lists and blocklists
++
++The *topaz* device (codename *tapas*) requires a set of kernel module list
++files that specifies which vendor modules should be loaded at boot and
++which should be blocked.  These files are dropped from the `topnotchfreaks`
++`kernel_msm-5.15` `zepharo` branch and are now part of the Apex
++repository under `kernel/`:
++* `modules.list.msm.topaz` – list of modules to load.
++* `modules.systemdlkm_blocklist.msm.topaz` – system DLKM blocklist.
++* `modules.vendor_blocklist.msm.topaz` – vendor DLKM blocklist.
++
++They are automatically copied into the kernel tree by the helper script
++`topaz-module-lists.sh` that is invoked from `apply.sh`.
++
++**Conflict notes** – None of the modules blocked by `modules.vendor_blocklist.msm.topaz`
++interfere with the apex pentest autoloading logic.  No conflicts were
++observed during the build.
+*** End Patch

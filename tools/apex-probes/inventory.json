@@ -1,0 +1,173 @@
+[
+  {
+    "name": "device_info",
+    "command": "getprop ro.product.device",
+    "timeout": 10,
+    "byte_budget": 1024,
+    "root": false,
+    "description": "Device codename",
+    "category": "identity"
+  },
+  {
+    "name": "device_model",
+    "command": "getprop ro.product.model",
+    "timeout": 10,
+    "byte_budget": 1024,
+    "root": false,
+    "description": "Device model",
+    "category": "identity"
+  },
+  {
+    "name": "kernel_version",
+    "command": "uname -r",
+    "timeout": 10,
+    "byte_budget": 1024,
+    "root": false,
+    "description": "Kernel version string",
+    "category": "identity"
+  },
+  {
+    "name": "kernel_string",
+    "command": "cat /proc/version",
+    "timeout": 10,
+    "byte_budget": 4096,
+    "root": false,
+    "description": "Full kernel version string",
+    "category": "identity"
+  },
+  {
+    "name": "build_fingerprint",
+    "command": "getprop ro.build.fingerprint",
+    "timeout": 10,
+    "byte_budget": 1024,
+    "root": false,
+    "description": "Build fingerprint",
+    "category": "identity"
+  },
+  {
+    "name": "battery_capacity",
+    "command": "cat /sys/class/power_supply/battery/capacity",
+    "timeout": 10,
+    "byte_budget": 1024,
+    "root": false,
+    "description": "Battery state of charge (%)",
+    "category": "battery"
+  },
+  {
+    "name": "battery_status",
+    "command": "cat /sys/class/power_supply/battery/status",
+    "timeout": 10,
+    "byte_budget": 1024,
+    "root": false,
+    "description": "Battery charging status",
+    "category": "battery"
+  },
+  {
+    "name": "battery_health",
+    "command": "cat /sys/class/power_supply/battery/health",
+    "timeout": 10,
+    "byte_budget": 1024,
+    "root": false,
+    "description": "Battery health status",
+    "category": "battery"
+  },
+  {
+    "name": "battery_technology",
+    "command": "cat /sys/class/power_supply/battery/technology",
+    "timeout": 10,
+    "byte_budget": 1024,
+    "root": false,
+    "description": "Battery technology",
+    "category": "battery"
+  },
+  {
+    "name": "charger_type",
+    "command": "cat /sys/class/qcom-battery/quick_charge_type 2>/dev/null || echo -1",
+    "timeout": 10,
+    "byte_budget": 1024,
+    "root": false,
+    "description": "Quick charge type (0=none, 4=HVDCP, 5=PD)",
+    "category": "charging"
+  },
+  {
+    "name": "thermal_zones",
+    "command": "cat /sys/class/thermal/thermal_zone0/temp 2>/dev/null || echo -1",
+    "timeout": 10,
+    "byte_budget": 1024,
+    "root": false,
+    "description": "Thermal zone 0 temperature (millidegrees C)",
+    "category": "thermal"
+  },
+  {
+    "name": "apex_state",
+    "command": "cat /proc/apex/state 2>/dev/null || echo unavailable",
+    "timeout": 10,
+    "byte_budget": 4096,
+    "root": false,
+    "description": "Apex state machine status",
+    "category": "apex"
+  },
+  {
+    "name": "apex_version",
+    "command": "cat /proc/apex/version 2>/dev/null || echo unavailable",
+    "timeout": 10,
+    "byte_budget": 4096,
+    "root": false,
+    "description": "Apex kernel version",
+    "category": "apex"
+  },
+  {
+    "name": "apex_charge_status",
+    "command": "cat /proc/apex_charge/status 2>/dev/null || echo unavailable",
+    "timeout": 10,
+    "byte_budget": 8192,
+    "root": false,
+    "description": "Apex charge manager full status",
+    "category": "charging"
+  },
+  {
+    "name": "wakeup_sources",
+    "command": "cat /sys/kernel/debug/wakeup_sources 2>/dev/null || echo unavailable",
+    "timeout": 15,
+    "byte_budget": 262144,
+    "root": true,
+    "description": "Wakelock sources (root required)",
+    "category": "power"
+  },
+  {
+    "name": "boot_slot",
+    "command": "getprop ro.boot.slot_suffix",
+    "timeout": 10,
+    "byte_budget": 1024,
+    "root": false,
+    "description": "Active boot slot suffix (A/B devices)",
+    "category": "boot"
+  },
+  {
+    "name": "cpu_info",
+    "command": "cat /proc/cpuinfo",
+    "timeout": 10,
+    "byte_budget": 65536,
+    "root": false,
+    "description": "CPU information",
+    "category": "hardware"
+  },
+  {
+    "name": "meminfo",
+    "command": "cat /proc/meminfo",
+    "timeout": 10,
+    "byte_budget": 32768,
+    "root": false,
+    "description": "Memory information",
+    "category": "hardware"
+  },
+  {
+    "name": "power_supply",
+    "command": "ls /sys/class/power_supply/",
+    "timeout": 10,
+    "byte_budget": 4096,
+    "root": false,
+    "description": "Power supply device list",
+    "category": "charging"
+  }
+]

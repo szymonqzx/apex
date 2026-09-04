@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "APEX Trust Manifest",
+  "description": "Host-authoritative trust manifest issued by gate evaluator",
+  "type": "object",
+  "required": ["schema_version", "manifest_id", "run_id", "artifact_state", "manifest_hash"],
+  "properties": {
+    "schema_version": {"type": "string", "enum": ["1.0"]},
+    "manifest_id": {"type": "string"},
+    "run_id": {"type": "string"},
+    "build_hash": {"type": "string"},
+    "profile_hash": {"type": "string"},
+    "artifact_state": {
+      "type": "string",
+      "enum": ["UNVERIFIED", "OBSERVE_ONLY", "PARTIAL", "CANDIDATE",
+               "CERTIFIED", "CERTIFIED_WITH_WAIVERS", "FAILED", "INVALID",
+               "STALE", "ROLLED_BACK"]
+    },
+    "gates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["gate_name", "state"],
+        "properties": {
+          "gate_name": {"type": "string"},
+          "state": {"type": "string", "enum": ["pass", "fail", "missing", "waived"]},
+          "detail": {"type": "string"},
+          "evidence_hash": {"type": "string"}
+        }
+      }
+    },
+    "waivers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["gate_name", "reason", "actor", "scope"],
+        "properties": {
+          "gate_name": {"type": "string"},
+          "reason": {"type": "string"},
+          "actor": {"type": "string"},
+          "scope": {"type": "string", "enum": ["run", "build", "gate"]},
+          "timestamp": {"type": "string"}
+        }
+      }
+    },
+    "evidence_age_hours": {"type": "number"},
+    "manifest_hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "timestamp": {"type": "string"}
+  }
+}

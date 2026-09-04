@@ -1,0 +1,61 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "APEX Evidence Bundle",
+  "description": "Sealed evidence bundle with SHA-256 part inventory",
+  "type": "object",
+  "required": ["schema_version", "run_id", "boot_id", "timestamp", "parts", "bundle_hash", "state"],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": ["1.0"],
+      "description": "Bundle schema version"
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^\\d{8}T\\d{6}Z-[a-f0-9]{8}$",
+      "description": "Unique run identifier"
+    },
+    "boot_id": {
+      "type": "string",
+      "description": "Boot-scoped identifier"
+    },
+    "build_hash": {
+      "type": "string",
+      "description": "Build identity hash"
+    },
+    "profile_hash": {
+      "type": "string",
+      "description": "Capability profile hash"
+    },
+    "timestamp": {
+      "type": "string",
+      "description": "ISO 8601 timestamp"
+    },
+    "bundle_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "SHA-256 of all part hashes"
+    },
+    "state": {
+      "type": "string",
+      "enum": ["PARTIAL", "SEALED", "NORMALIZED"]
+    },
+    "taint": {
+      "type": "string",
+      "enum": ["CLEAN", "TAINTED"]
+    },
+    "parts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "source", "content_hash"],
+        "properties": {
+          "name": {"type": "string"},
+          "source": {"type": "string", "enum": ["probe", "command", "arbitrary"]},
+          "content_hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+          "metadata": {"type": "object"}
+        }
+      }
+    }
+  }
+}

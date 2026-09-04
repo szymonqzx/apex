@@ -4,24 +4,24 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-KERNEL_ROOT="${KERNEL_ROOT:-$(pwd)}"
+KERNEL_ROOT="${1:-${KERNEL_ROOT:-$(cd "$(dirname "$0")/../../kernel" && pwd)}}"
 SRC_DIR="$SCRIPT_DIR/src"
 
 echo "  [apex-charge] Applying advanced charging & battery manager patch..."
 
 # Copy source files to kernel tree
-mkdir -p "$KERNEL_ROOT/drivers/power_supply/apex"
-cp "$SRC_DIR/apex_charge.c" "$KERNEL_ROOT/drivers/power_supply/apex/"
+mkdir -p "$KERNEL_ROOT/drivers/power/supply/apex"
+cp "$SRC_DIR/apex_charge.c" "$KERNEL_ROOT/drivers/power/supply/apex/"
 
 # Add to Makefile
-MAKEFILE="$KERNEL_ROOT/drivers/power_supply/apex/Makefile"
+MAKEFILE="$KERNEL_ROOT/drivers/power/supply/apex/Makefile"
 cat > "$MAKEFILE" << 'EOF'
 # APEX Charge Manager
 obj-$(CONFIG_APEX_CHARGE) += apex_charge.o
 EOF
 
 # Add Kconfig entry
-KCONFIG="$KERNEL_ROOT/drivers/power_supply/Kconfig"
+KCONFIG="$KERNEL_ROOT/drivers/power/supply/Kconfig"
 if ! grep -q 'APEX_CHARGE' "$KCONFIG" 2>/dev/null; then
     # Insert before the endif for POWER_SUPPLY
     sed -i '/^endif # POWER_SUPPLY/i\
@@ -40,7 +40,7 @@ config APEX_CHARGE\
 fi
 
 # Add to parent Makefile
-PARENT_MAKE="$KERNEL_ROOT/drivers/power_supply/Makefile"
+PARENT_MAKE="$KERNEL_ROOT/drivers/power/supply/Makefile"
 if ! grep -q 'apex' "$PARENT_MAKE" 2>/dev/null; then
     echo 'obj-$(CONFIG_APEX_CHARGE) += apex/' >> "$PARENT_MAKE"
 fi

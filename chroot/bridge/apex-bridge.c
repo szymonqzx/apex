@@ -190,11 +190,15 @@ static void handle_command(const char *cmd_in, char *response, size_t resp_len)
 	trim(cmd);
 
 	if (strcmp(cmd, "screen_on") == 0) {
-		apex_write_policy("screen_on");
-		snprintf(response, resp_len, "OK");
+		if (apex_write_policy("screen_on") < 0)
+			snprintf(response, resp_len, "ERROR: failed to write screen_on");
+		else
+			snprintf(response, resp_len, "OK");
 	} else if (strcmp(cmd, "screen_off") == 0) {
-		apex_write_policy("screen_off");
-		snprintf(response, resp_len, "OK");
+		if (apex_write_policy("screen_off") < 0)
+			snprintf(response, resp_len, "ERROR: failed to write screen_off");
+		else
+			snprintf(response, resp_len, "OK");
 	} else if (strncmp(cmd, "game ", 5) == 0) {
 		arg = cmd + 5;
 		trim(arg);
@@ -204,8 +208,10 @@ static void handle_command(const char *cmd_in, char *response, size_t resp_len)
 		}
 		char policy_cmd[16];
 		snprintf(policy_cmd, sizeof(policy_cmd), "game %s", arg);
-		apex_write_policy(policy_cmd);
-		snprintf(response, resp_len, "OK gaming=%s", arg);
+		if (apex_write_policy(policy_cmd) < 0)
+			snprintf(response, resp_len, "ERROR: failed to write game policy");
+		else
+			snprintf(response, resp_len, "OK gaming=%s", arg);
 	} else if (strncmp(cmd, "charge ", 7) == 0) {
 		arg = cmd + 7;
 		trim(arg);
@@ -215,8 +221,10 @@ static void handle_command(const char *cmd_in, char *response, size_t resp_len)
 		}
 		char policy_cmd[16];
 		snprintf(policy_cmd, sizeof(policy_cmd), "charge %s", arg);
-		apex_write_policy(policy_cmd);
-		snprintf(response, resp_len, "OK");
+		if (apex_write_policy(policy_cmd) < 0)
+			snprintf(response, resp_len, "ERROR: failed to write charge policy");
+		else
+			snprintf(response, resp_len, "OK");
 	} else if (strncmp(cmd, "audio ", 6) == 0) {
 		arg = cmd + 6;
 		trim(arg);
@@ -226,8 +234,10 @@ static void handle_command(const char *cmd_in, char *response, size_t resp_len)
 		}
 		char policy_cmd[16];
 		snprintf(policy_cmd, sizeof(policy_cmd), "audio %s", arg);
-		apex_write_policy(policy_cmd);
-		snprintf(response, resp_len, "OK");
+		if (apex_write_policy(policy_cmd) < 0)
+			snprintf(response, resp_len, "ERROR: failed to write audio policy");
+		else
+			snprintf(response, resp_len, "OK");
 	} else if (strcmp(cmd, "status") == 0) {
 		char status[1024];
 		if (apex_read_proc(PROC_STATUS, status, sizeof(status)) == 0) {

@@ -22,40 +22,42 @@ from pathlib import Path
 APEX = Path(__file__).parent.parent
 DEFCONFIG_DIR = APEX / "defconfig"
 
-# Known dependency rules
+# Known dependency rules — keys and deps use the CONFIG_ prefix to match
+# the form stored by parse_config().  The bare-name form used previously
+# never matched the merged dict, making the entire dependency check dead.
 DEPENDENCIES = {
-    "CPU_FREQ_GOV_APEX": ["CPU_FREQ", "CPU_FREQ_GOV_COMMON"],
-    "CPU_FREQ_GOV_SCHEDUTIL": ["CPU_FREQ"],
-    "SCHED_WALT": ["SMP"],
-    "SCHED_CASS": [],
-    "APEX": [],
-    "APEX_WATCHDOG": ["APEX"],
-    "APEX_IMMORTAL": ["APEX"],
-    "APEX_USB_AUTOLOAD": ["USB"],
-    "APEX_KCAL": ["FB"],
-    "APEX_SIMPLE_LMK": [],
-    "APEX_MEMFREQ": ["DEVFREQ", "INTERCONNECT"],
-    "ZRAM_WRITEBACK": ["ZRAM"],
-    "KSM": ["MMU"],
-    "CFI_CLANG": ["CC_IS_CLANG"],
-    "LTO_CLANG_THIN": ["CC_IS_CLANG"],
-    "WIREGUARD": [],
-    "EXFAT_FS": [],
-    "NTFS3_FS": [],
-    "LRU_GEN": [],
-    "WQ_POWER_EFFICIENT": [],
-    "RCU_LAZY": [],
-    "NET_SCH_FQ": [],
-    "TCP_CONG_BBR": [],
-    "TCP_CONG_WESTWOOD": [],
+    "CONFIG_CPU_FREQ_GOV_APEX": ["CONFIG_CPU_FREQ", "CONFIG_CPU_FREQ_GOV_COMMON"],
+    "CONFIG_CPU_FREQ_GOV_SCHEDUTIL": ["CONFIG_CPU_FREQ"],
+    "CONFIG_SCHED_WALT": ["CONFIG_SMP"],
+    "CONFIG_SCHED_CASS": [],
+    "CONFIG_APEX": [],
+    "CONFIG_APEX_WATCHDOG": ["CONFIG_APEX"],
+    "CONFIG_APEX_IMMORTAL": ["CONFIG_APEX"],
+    "CONFIG_APEX_USB_AUTOLOAD": ["CONFIG_USB"],
+    "CONFIG_APEX_KCAL": ["CONFIG_FB"],
+    "CONFIG_APEX_SIMPLE_LMK": [],
+    "CONFIG_APEX_MEMFREQ": ["CONFIG_DEVFREQ", "CONFIG_INTERCONNECT"],
+    "CONFIG_ZRAM_WRITEBACK": ["CONFIG_ZRAM"],
+    "CONFIG_KSM": ["CONFIG_MMU"],
+    "CONFIG_CFI_CLANG": ["CONFIG_CC_IS_CLANG"],
+    "CONFIG_LTO_CLANG_THIN": ["CONFIG_CC_IS_CLANG"],
+    "CONFIG_WIREGUARD": [],
+    "CONFIG_EXFAT_FS": [],
+    "CONFIG_NTFS3_FS": [],
+    "CONFIG_LRU_GEN": [],
+    "CONFIG_WQ_POWER_EFFICIENT": [],
+    "CONFIG_RCU_LAZY": [],
+    "CONFIG_NET_SCH_FQ": [],
+    "CONFIG_TCP_CONG_BBR": [],
+    "CONFIG_TCP_CONG_WESTWOOD": [],
 }
 
 # Known conflicts (can't both be default governor)
 CONFLICTS = [
-    ("CPU_FREQ_DEFAULT_GOV_APEX", "CPU_FREQ_DEFAULT_GOV_SCHEDUTIL"),
-    ("CPU_FREQ_DEFAULT_GOV_APEX", "CPU_FREQ_DEFAULT_GOV_PERFORMANCE"),
-    ("CPU_FREQ_DEFAULT_GOV_SCHEDUTIL", "CPU_FREQ_DEFAULT_GOV_PERFORMANCE"),
-    ("TRANSPARENT_HUGEPAGE_ALWAYS", "TRANSPARENT_HUGEPAGE_MADVISE"),
+    ("CONFIG_CPU_FREQ_DEFAULT_GOV_APEX", "CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL"),
+    ("CONFIG_CPU_FREQ_DEFAULT_GOV_APEX", "CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE"),
+    ("CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL", "CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE"),
+    ("CONFIG_TRANSPARENT_HUGEPAGE_ALWAYS", "CONFIG_TRANSPARENT_HUGEPAGE_MADVISE"),
 ]
 
 # Configs that must be =y (built-in, not module)
@@ -199,9 +201,8 @@ def main():
         elif args.verbose and val == "n":
             print(f"  [OK] {config}=n (disabled)")
 
-    # Check for USERFAULTFD (legacy check, also in REQUIRED_N)
-    if merged.get("USERFAULTFD") == "y":
-        warnings += 1  # Already counted above
+    # USERFAULTFD is already checked above via REQUIRED_N with the CONFIG_ prefix.
+    # The previous bare-name check was dead because merged keys always carry CONFIG_.
 
     # Feature summary
     print("\n  --- Feature Summary ---")

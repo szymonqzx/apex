@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# tools/build-kernel.sh — build the apex kernel for Redmi Note 12 4G (topaz)
+# tools/build-kernel.sh — build the APEX kernel for Redmi Note 12 4G (topaz)
 #
-# Usage: ./build-kernel.sh [defconfig] [variant] [--clean] [--dry-run]
+# Base: Zepharo R9 (topnotchfreaks/kernel_msm-5.15, Linux 5.15.170)
+#
+# Usage: ./build-kernel.sh [defconfig] [--clean] [--dry-run]
 #                              [--modules] [--version] [--profile <name>]
-#   defconfig: chickernel_defconfig (default) or khaje-stock_defconfig
-#   variant:   none (default), ksun, ksun.susfs
-#   --profile: battery, balanced (default), performance
+#   defconfig: apex_defconfig (default)
+#   --profile: battery, performance (default: neutral — no fragment)
 #   --clean:   force full rebuild (default: incremental)
 #   --dry-run: show what would be done without executing
 #   --modules: only build modules (skip Image)
@@ -17,9 +18,8 @@ APEX="$(cd "$HERE/.." && pwd)"
 KERNEL="$APEX/kernel"
 OUT="$APEX/out"
 
-DEFCONFIG="chickernel_defconfig"
-VARIANT=""
-PROFILE="balanced"
+DEFCONFIG="apex_defconfig"
+PROFILE=""
 DO_CLEAN=0
 DRY_RUN=0
 MODULES_ONLY=0
@@ -32,16 +32,15 @@ while [ $# -gt 0 ]; do
     --dry-run) DRY_RUN=1 ;;
     --modules) MODULES_ONLY=1 ;;
     --version) SHOW_VERSION=1 ;;
-    --profile) shift; PROFILE="${1:-balanced}" ;;
+    --profile) shift; PROFILE="${1:-}" ;;
     battery|balanced|performance) PROFILE="$1" ;;
-    ksun|ksun.susfs) VARIANT="$1" ;;
     *_defconfig) DEFCONFIG="$1" ;;
   esac
   shift
 done
 
 # --- Version info ---
-APEX_VERSION="1.2.0"
+APEX_VERSION="0.1.0-zepharo"
 GIT_HASH="$(cd "$APEX" 2>/dev/null && git rev-parse --short HEAD 2>/dev/null || echo 'unknown')"
 BUILD_DATE="$(date '+%Y-%m-%d %H:%M:%S')"
 
@@ -50,14 +49,14 @@ if [ "$SHOW_VERSION" -eq 1 ]; then
   echo "  git:     $GIT_HASH"
   echo "  date:    $BUILD_DATE"
   echo "  target:  Redmi Note 12 4G (topaz/tapas)"
-  echo "  kernel:  Linux 5.15.211 (CAF bengal-5.15)"
+  echo "  kernel:  Linux 5.15.170 (Zepharo R9, CAF msm-5.15)"
+  echo "  base:    $(cat "$KERNEL/.apex-base" 2>/dev/null | grep 'Source:' || echo 'unknown')"
   exit 0
 fi
 
 JOBS=$(nproc)
 
 # --- Toolchain dependency checks ---
-# Supports: system clang (default), Neutron Clang (via --neutron or NEUTRON_CLANG env)
 check_toolchain() {
   local missing=0
   local tools=(
@@ -78,12 +77,20 @@ check_toolchain() {
   done
   if [ "$missing" -gt 0 ]; then
     echo "  $missing tool(s) missing. Install clang/llvm and aarch64-linux-gnu-gcc." >&2
-    echo "  Or set NEUTRON_CLANG=/path/to/neutron/clang/bin" >&2
     exit 1
   fi
+
+  # Toolchain version gate
+  local clang_ver
+  clang_ver="$(clang --version 2>/dev/null | head -1 | grep -oP 'version \K[0-9]+' || echo 0)"
+  if [ "$clang_ver" -lt 17 ]; then
+    echo "  ERROR: clang >= 17 required (found $clang_ver)" >&2
+    exit 1
+  fi
+  echo "  toolchain: clang $clang_ver"
 }
 
-# Neutron Clang support (actively maintained, LTO + PGO + BOLT + Polly)
+# Neutron Clang support (optional — for Polly/LTO/PGO)
 if [ -n "${NEUTRON_CLANG:-}" ] && [ -d "${NEUTRON_CLANG}/bin" ]; then
   export PATH="${NEUTRON_CLANG}/bin:$PATH"
   echo "  Using Neutron Clang: ${NEUTRON_CLANG}/bin"
@@ -91,8 +98,7 @@ fi
 
 echo "=== APEX kernel build v$APEX_VERSION ==="
 echo "  defconfig: $DEFCONFIG"
-echo "  variant:   ${VARIANT:-none}"
-echo "  profile:   $PROFILE"
+echo "  profile:   ${PROFILE:-neutral}"
 echo "  jobs:      $JOBS"
 echo "  kernel:    $KERNEL"
 echo "  out:       $OUT"
@@ -110,6 +116,13 @@ fi
   echo "kernel tree not found: $KERNEL" >&2
   exit 1
 }
+
+# --- Preflight: fast structural checks before long build ---
+if [ -x "$APEX/tools/build-preflight.sh" ]; then
+  if ! "$APEX/tools/build-preflight.sh" "$KERNEL"; then
+    exit 1
+  fi
+fi
 
 # Timer helper
 phase_start=0
@@ -154,11 +167,11 @@ if [ "$DRY_RUN" -eq 0 ]; then
 fi
 end_phase
 
-# 2. Apply all patches (failures are fatal)
-start_phase "Applying apex patches"
+# 2. Apply patches from patches/apex-new/ only
+start_phase "Applying APEX patches"
 if [ "$DRY_RUN" -eq 0 ]; then
   PATCH_FAILURES=0
-  for patch_dir in "$APEX"/patches/apex-*; do
+  for patch_dir in "$APEX"/patches/apex-new/*/; do
     [ -d "$patch_dir" ] || continue
     if [ -f "$patch_dir/apply.sh" ]; then
       echo "  applying: $(basename "$patch_dir")"
@@ -169,42 +182,31 @@ if [ "$DRY_RUN" -eq 0 ]; then
     fi
   done
 
-  if [ -d "$APEX/patches/device-backports" ] && [ -f "$APEX/patches/device-backports/apply.sh" ]; then
-    echo "  applying: device-backports"
-    if ! bash "$APEX/patches/device-backports/apply.sh" "$KERNEL"; then
-      echo "  ERROR: device-backports apply failed!" >&2
-      PATCH_FAILURES=$((PATCH_FAILURES + 1))
-    fi
-  fi
-
   if [ "$PATCH_FAILURES" -gt 0 ]; then
     echo ">>> $PATCH_FAILURES patch(es) failed. Aborting build." >&2
-    echo "    (Patches may already be applied — re-run with --clean if you" >&2
-    echo "     want to start from a fresh kernel tree.)" >&2
     exit 1
+  fi
+
+  if [ -z "$(ls -A "$APEX/patches/apex-new/" 2>/dev/null)" ]; then
+    echo "  (no patches in patches/apex-new/ — bare base build)"
   fi
 fi
 end_phase
 
-# 3. Merge defconfig fragments
+# 3. Merge defconfig fragments (profile only — base is in apex_defconfig)
 start_phase "Merging defconfig fragments"
 FRAGMENTS=""
-for frag in "$APEX"/defconfig/*.config; do
-  [ -f "$frag" ] || continue
-  FRAGMENTS="$FRAGMENTS $frag"
-done
 
-if [ -n "$VARIANT" ] && [ -f "$KERNEL/arch/arm64/configs/chickernel-variants/$VARIANT.config" ]; then
-  FRAGMENTS="$FRAGMENTS $KERNEL/arch/arm64/configs/chickernel-variants/$VARIANT.config"
-fi
-
-# 3b. Add profile-specific defconfig fragment
-PROFILE_FRAG="$APEX/defconfig/profile-${PROFILE}.config"
-if [ -f "$PROFILE_FRAG" ]; then
-  FRAGMENTS="$FRAGMENTS $PROFILE_FRAG"
-  echo "  profile fragment: $PROFILE_FRAG"
+if [ -n "$PROFILE" ]; then
+  PROFILE_FRAG="$APEX/defconfig/profile-${PROFILE}.config"
+  if [ -f "$PROFILE_FRAG" ]; then
+    FRAGMENTS="$FRAGMENTS $PROFILE_FRAG"
+    echo "  profile fragment: $PROFILE_FRAG"
+  else
+    echo "  WARNING: profile fragment not found: $PROFILE_FRAG" >&2
+  fi
 else
-  echo "  WARNING: profile fragment not found: $PROFILE_FRAG" >&2
+  echo "  (neutral — no profile fragment)"
 fi
 end_phase
 
@@ -212,12 +214,12 @@ end_phase
 start_phase "Configuring kernel"
 if [ "$DRY_RUN" -eq 0 ]; then
   cd "$KERNEL"
-  make O="$OUT" ARCH=arm64 "$DEFCONFIG"
+  make O="$OUT" ARCH=arm64 CC=clang "$DEFCONFIG"
 
   if [ -n "$FRAGMENTS" ]; then
     ./scripts/kconfig/merge_config.sh -m -r -O "$OUT" \
       "$OUT/.config" $FRAGMENTS
-    make O="$OUT" ARCH=arm64 olddefconfig </dev/null
+    make O="$OUT" ARCH=arm64 CC=clang olddefconfig </dev/null
   fi
 fi
 end_phase
@@ -245,7 +247,7 @@ if [ "$DRY_RUN" -eq 0 ]; then
       KCFLAGS="-march=armv8.4-a+crc+sha2+aes -Wno-error" \
       modules
   else
-    make O="$OUT" ARCH=arm64 -j"$JOBS" W=1 \
+    make O="$OUT" ARCH=arm64 -j"$JOBS" \
       CROSS_COMPILE=aarch64-linux-gnu- \
       CROSS_COMPILE_COMPAT=aarch64-linux-gnu- \
       CC=clang \
@@ -269,20 +271,19 @@ if [ "$DRY_RUN" -eq 0 ] && [ "$MODULES_ONLY" -eq 0 ]; then
     echo ""
     echo "=== Build successful ==="
     echo "  Image: $KERNEL_IMAGE ($(du -h "$KERNEL_IMAGE" | cut -f1))"
-    ls -la "$OUT"/arch/arm64/boot/dts/qcom/*.dtb 2>/dev/null | head -5
-    echo ""
-    echo "  Modules:"
-    find "$OUT" -name "*.ko" | head -20
-    echo ""
-
-    # 6b. Compile SELinux policy
-    start_phase "Compiling SELinux policy"
-    if [ -x "$APEX/tools/compile-selinux.sh" ]; then
-      "$APEX/tools/compile-selinux.sh"
+    # DTB listing is non-fatal (Zepharo has no topaz DTS)
+    dtb_count=$(find "$OUT"/arch/arm64/boot/dts -name "*.dtb" 2>/dev/null | wc -l)
+    if [ "$dtb_count" -gt 0 ]; then
+      echo "  DTBs: $dtb_count"
+      find "$OUT"/arch/arm64/boot/dts -name "*.dtb" 2>/dev/null | head -5
+    else
+      echo "  DTBs: none (expected — DTB comes from device/stock kernel)"
     fi
-    end_phase
-
-    echo "  Next: ./tools/verify.sh && ./tools/package-anykernel3.sh"
+    echo ""
+    MODULE_COUNT=$(find "$OUT" -name "*.ko" | wc -l)
+    echo "  Modules: $MODULE_COUNT"
+    echo ""
+    echo "  Next: ./tools/package-anykernel3.sh"
   else
     echo "=== Build FAILED ==="
     exit 1
@@ -294,6 +295,6 @@ elif [ "$DRY_RUN" -eq 1 ]; then
 elif [ "$MODULES_ONLY" -eq 1 ]; then
   echo ""
   echo "=== Module build complete ==="
-  echo "  Modules:"
-  find "$OUT" -name "*.ko" | head -20
+  MODULE_COUNT=$(find "$OUT" -name "*.ko" | wc -l)
+  echo "  Modules: $MODULE_COUNT"
 fi

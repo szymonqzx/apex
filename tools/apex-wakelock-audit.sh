@@ -27,37 +27,37 @@ WAKEUP_SOURCES="/sys/kernel/debug/wakeup_sources"
 WL_BLACKLIST_DIR="/data/adb/apex/wakelock-blacklist"
 
 # Wakelocks that are SAFE to suppress (cosmetic / telemetry-adjacent)
-# Format: one pattern per line, matched against wakelock name
-SAFE_PATTERNS="\
-telemetry\
-analytics\
-miui.*report\
-xiaomi.*log\
-data.*report\
-usage.*stats\
-feedback\
-crash.*report\
-"
+# Format: one pattern per line, matched against wakelock name.
+# NOTE: Each pattern MUST be on its own line.  The previous form used
+# backslash-continued lines inside double quotes, which concatenates
+# without newlines — producing one giant string like
+# "telemetryanalyticsmiui.*report..." that never matches anything.
+SAFE_PATTERNS='telemetry
+analytics
+miui.*report
+xiaomi.*log
+data.*report
+usage.*stats
+feedback
+crash.*report'
 
 # Wakelocks that must NEVER be suppressed (connectivity-critical)
 # If a wakelock matches any of these, it is spared regardless of SAFE_PATTERNS
-PROTECTED_PATTERNS="\
-qmi\
-ril\
-modem\
-wlan\
-wifi\
-ath\
-wcn\
-cnss\
-ipc\
-dsi\
-display\
-panel\
-sensor\
-alarm\
-power.*key\
-"
+PROTECTED_PATTERNS='qmi
+ril
+modem
+wlan
+wifi
+ath
+wcn
+cnss
+ipc
+dsi
+display
+panel
+sensor
+alarm
+power.*key'
 
 echo "=== APEX Wakelock Audit ==="
 echo "Mode: $MODE"
@@ -93,24 +93,34 @@ while IFS= read -r line; do
   TOTAL=$((TOTAL + 1))
 
   # Check if protected (connectivity-critical)
+  # NOTE: The original code used `echo "$PROTECTED_PATTERNS" | while ...`
+  # which runs the while loop in a pipeline *subshell*.  Variables set
+  # inside that subshell (IS_PROTECTED=1) never propagated to the parent
+  # shell, so every wakelock was classified as UNKNOWN — including
+  # modem/RIL/QMI wakelocks that must never be suppressed.  Fix: use a
+  # here-doc redirect (no pipeline subshell) so variables survive.
   IS_PROTECTED=0
-  echo "$PROTECTED_PATTERNS" | while IFS= read -r pat; do
+  while IFS= read -r pat; do
     [ -z "$pat" ] && continue
     if echo "$WL_NAME" | grep -qi "$pat"; then
       IS_PROTECTED=1
       break
     fi
-  done
+  done <<EOF
+$PROTECTED_PATTERNS
+EOF
 
   # Check if safe to suppress
   IS_SAFE=0
-  echo "$SAFE_PATTERNS" | while IFS= read -r pat; do
+  while IFS= read -r pat; do
     [ -z "$pat" ] && continue
     if echo "$WL_NAME" | grep -qi "$pat"; then
       IS_SAFE=1
       break
     fi
-  done
+  done <<EOF
+$SAFE_PATTERNS
+EOF
 
   if [ "$IS_PROTECTED" -eq 1 ]; then
     echo "  [SPARE] $WL_NAME (protected: connectivity-critical)"

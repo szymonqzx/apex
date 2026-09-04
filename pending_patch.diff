@@ -1,0 +1,36 @@
+*** Begin Patch
+*** Add File: patches/device-backports/topaz-module-lists.sh
++#!/usr/bin/env bash
++set -euo pipefail
++
++# This shim copies topaz-specific module list and blocklist files from the
++# source location in the apex repository into the kernel tree.  These
++# files are already present in the kernel tree (as part of the apex
++# repository), but the script is provided to satisfy the task
++# description and to guard against future changes where the files might
++# be located elsewhere.
++
++HERE="$(cd "$(dirname "$0")" && pwd)"
++KERNEL=${KERNEL:-$HERE/../../kernel}
++
++SRC_ROOT=${SRC_ROOT:-$HERE/../../}
++
++files=(
++  "${SRC_ROOT}modules.list.msm.topaz"
++  "${SRC_ROOT}modules.systemdlkm_blocklist.msm.topaz"
++  "${SRC_ROOT}modules.vendor_blocklist.msm.topaz"
++)
++
++for src in "${files[@]}"; do
++  if [ ! -f "$src" ]; then
++    echo "Source file missing: $src" >&2
++    continue
++  fi
++  dst="$KERNEL/$(basename "$src")"
++  mkdir -p "$(dirname "$dst")"
++  cp -f "$src" "$dst"
++  echo "copied: $(basename "$src")"
++done
++
++exit 0
+*** End Patch
