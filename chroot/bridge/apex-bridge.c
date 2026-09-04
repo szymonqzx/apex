@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * apex-bridge: userspace daemon that bridges the Android framework to the
- * kernel apex state machine via /proc/apex/policy.
+ * kernel apex state machine via /sys/class/apex/.
  *
  * Listens on a Unix domain socket at /dev/socket/apex-bridge for simple
  * text-based commands from the Apex Control app or other privileged clients.
@@ -14,19 +14,19 @@
  *   - Battery level (via sysfs power_supply capacity)
  *   - Thermal zones (via sysfs thermal_zone)
  *
- * And writes the corresponding commands to /proc/apex/policy.
+ * And writes the corresponding commands to /sys/class/apex/policy.
  *
  * Protocol: newline-terminated text commands:
- *   "screen_on"     -> write screen_on to /proc/apex/policy
- *   "screen_off"    -> write screen_off to /proc/apex/policy
- *   "game 0|1"      -> write game N to /proc/apex/policy
- *   "charge 0|1"    -> write charge N to /proc/apex/policy
- *   "audio 0|1"     -> write audio N to /proc/apex/policy
- *   "status"        -> read /proc/apex/state and return it
- *   "version"       -> read /proc/apex/version and return it
- *   "governor"      -> read /proc/apex/governor and return it
- *   "watchdog"      -> read /proc/apex/watchdog and return it
- *   "health"        -> read /proc/apex/health and return it
+ *   "screen_on"     -> write screen_on to /sys/class/apex/policy
+ *   "screen_off"    -> write screen_off to /sys/class/apex/policy
+ *   "game 0|1"      -> write game N to /sys/class/apex/policy
+ *   "charge 0|1"    -> write charge N to /sys/class/apex/policy
+ *   "audio 0|1"     -> write audio N to /sys/class/apex/policy
+ *   "status"        -> read /sys/class/apex/state and return it
+ *   "version"       -> read /sys/class/apex/version and return it
+ *   "governor"      -> read /sys/class/apex/governor and return it
+ *   "watchdog"      -> read /sys/class/apex/watchdog and return it
+ *   "health"        -> read /sys/class/apex/health and return it
  *
  * Build: cc -o apex-bridge apex-bridge.c -lpthread
  * Run:   apex-bridge (as root via init.rc)
@@ -50,18 +50,19 @@
 #include <android/log.h>
 
 #define SOCKET_PATH "/dev/socket/apex-bridge"
-#define PROC_POLICY "/proc/apex/policy"
-#define PROC_GAMING "/proc/apex/gaming"
-#define PROC_STATUS "/proc/apex/state"
-#define PROC_VERSION "/proc/apex/version"
-#define PROC_GOVERNOR "/proc/apex/governor"
-#define PROC_WATCHDOG "/proc/apex/watchdog"
-#define PROC_HEALTH "/proc/apex/health"
-#define PROC_THERMAL_PROFILE "/proc/apex/thermal_profile"
-#define PROC_POLICY_ACTIVE "/proc/apex/policy_active"
-#define PROC_BT_STATUS "/proc/apex/bt_status"
-#define PROC_SENSOR_STATUS "/proc/apex/sensor_status"
-#define PROC_MODULES "/proc/apex/modules"
+#define APEX_SYSFS "/sys/class/apex"
+#define PROC_POLICY APEX_SYSFS "/policy"
+#define PROC_GAMING APEX_SYSFS "/gaming"
+#define PROC_STATUS APEX_SYSFS "/state"
+#define PROC_VERSION APEX_SYSFS "/version"
+#define PROC_GOVERNOR APEX_SYSFS "/governor"
+#define PROC_WATCHDOG APEX_SYSFS "/watchdog"
+#define PROC_HEALTH APEX_SYSFS "/health"
+#define PROC_THERMAL_PROFILE APEX_SYSFS "/thermal_profile"
+#define PROC_POLICY_ACTIVE APEX_SYSFS "/policy_active"
+#define PROC_BT_STATUS APEX_SYSFS "/bt_status"
+#define PROC_SENSOR_STATUS APEX_SYSFS "/sensor_status"
+#define PROC_MODULES APEX_SYSFS "/modules"
 #define PROC_NH_CTL "/dev/nh_ctl"
 #define MAX_CLIENTS 16
 #define BUF_SIZE 8192
@@ -94,9 +95,9 @@ static int hexval(char c)
 }
 
 /* Log an incident to the Android log and optionally to the kernel
- * incident ring buffer via /proc/apex/policy (if writable).
+ * incident ring buffer via /sys/class/apex/policy (if writable).
  * This is the userspace equivalent of the kernel's apex_incident_log().
- * The kernel's /proc/apex/incidents is read-only (0444), so we can't
+ * The kernel's /sys/class/apex/incidents is read-only (0444), so we can't
  * write directly to it. Instead, we log to Android logbuf which is
  * captured in logcat and bug reports. */
 static void apex_incident_log(const char *fmt, ...)
@@ -122,7 +123,7 @@ static void signal_handler(int sig)
 	}
 }
 
-/* Write a command to /proc/apex/policy.
+/* Write a command to /sys/class/apex/policy.
  * Returns 0 on success, -1 on error. Checks write() return value. */
 static int apex_write_policy(const char *cmd)
 {

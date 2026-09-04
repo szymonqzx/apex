@@ -1,0 +1,8 @@
+config APEX_CHARGE
+	tristate "APEX charge control"
+	depends on APEX_SYSFS && POWER_SUPPLY
+	default m
+	help
+	  APEX charge control module providing sysfs tunables for
+	  charge limiting, mode selection, and bypass charging.
+	  Registers under /sys/class/apex/charge/.
