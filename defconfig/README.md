@@ -1,51 +1,52 @@
-# defconfig fragments
+# defconfig
 
-Kernel defconfig fragments that get merged into the final `bengal_apex_defconfig`.
+The kernel configuration uses a single hand-crafted `apex_defconfig` as the
+source of truth. This file is tracked in git at `defconfig/apex_defconfig`
+(`kernel/` itself is not in git — it is the Zepharo R9 base tree, extracted
+separately). The build script syncs this file into
+`kernel/arch/arm64/configs/apex_defconfig` before configuring, so a clean
+checkout builds identically.
 
-## Files
+All modern stack, security hardening, device driver, and performance settings
+are baked directly into the defconfig — no fragment merging.
 
-| File | Purpose |
-| :--- | :--- |
-| `display.config` | KCAL color calibration, BLX backlight dimmer |
-| `filesystems.config` | exFAT, NTFS3, F2FS compression, EROFS (USB OTG + flash storage) |
-| `governor.config` | apex governor, schedutil fallback, EPSS, CPU boost, thermal uclamp |
-| `hardening.config` | CFI, KASLR, no USERFAULTFD, module signing, FORTIFY_SOURCE |
-| `pentest.config` | NetHunter-compatible drivers as modules, WireGuard VPN |
-| `performance.config` | interconnect, DCVS, BFQ, TCP BBR+Westwood, FQ scheduler |
-| `root.config` | KernelSU-Next + SuSFS |
-| `scheduler.config` | PREEMPT, HZ=250, WALT, CASS, EAS, PSI, CPU idle, power-efficient workqueues, lazy RCU |
-| `toolchain.config` | Clang 22 + LLD + ThinLTO + BPF JIT |
-| `version.config` | Localversion string |
-| `zram.config` | ZRAM + ZSTD + writeback, KSM, transparent huge pages, MGLRU |
+## Profile variants
 
-## Merge
+There are **no compile-time profile fragments**. Profile switching
+(battery / balanced / performance) is handled at runtime by
+`rom-overlays/init.d/apex_profiles.rc`, which adjusts sysfs tunables
+(schedutil rate limits, WALT migration thresholds, GPU clocks, thermal
+trips, charge limits) on property change.
 
-The `build-kernel.sh` script merges all fragments using
-`scripts/kconfig/merge_config.sh` after loading the base defconfig.
-Fragments are applied alphabetically.
+## Build
 
 ```bash
-# Check for conflicts before building
-python3 tools/check-configs.py
+# Standard build (uses defconfig/apex_defconfig)
+./tools/build-kernel.sh
 
-# Build with all fragments
-./tools/build-kernel.sh chickernel_defconfig ksun
+# Clean build
+./tools/build-kernel.sh --clean
 ```
 
-## Key optimizations vs stock
+## Validation
 
-1. **Governor**: apex (non-linear power curve) replaces performance
-2. **Scheduler**: CASS + WALT replaces stock PELT-only
-3. **HZ**: 250 (4ms tick — balanced for 120Hz display + battery)
-4. **CPU idle**: multiple drivers + MENU governor + TEO governor + PSCI domain power-down
-5. **ZRAM**: ZSTD + writeback (vs stock LZO-RLE, no writeback)
-6. **MGLRU**: Multi-Gen LRU for improved page reclaim (if backported to CAF 5.15)
-7. **KSM**: enabled (stock disabled)
-8. **Security**: CFI, KASLR, no USERFAULTFD, FORTIFY_SOURCE, module signing
-9. **I/O**: BFQ + MQ_DEADLINE for low-latency UFS access
-10. **Networking**: TCP BBR (default) + Westwood (switchable) + FQ scheduler
-11. **Build**: ThinLTO with Clang 22 + LLD
-12. **Power**: Power-efficient workqueues + forced lazy RCU for idle savings
-13. **VPN**: WireGuard built-in
-14. **Storage**: exFAT + NTFS3 for USB OTG
-15. **Display**: KCAL RGB gain calibration
+```bash
+# Structural + dependency checks against the tracked defconfig
+python3 tools/check-configs.py
+
+# Full build-output verification
+./tools/verify.sh
+```
+
+## Key features in apex_defconfig
+
+1. **ThinLTO**: Clang ThinLTO with LLD for smaller binary and faster boot
+2. **Scheduler**: WALT (built-in) + EAS + UCLAMP + PREEMPT + HZ=250
+3. **ZRAM**: built-in, ZSTD compression + writeback
+4. **TCP**: BBR congestion control (module), cubic default
+5. **Security**: CFI, KASLR, Shadow Call Stack, SLAB hardening, lockdown LSM
+6. **I/O**: BFQ + MQ_DEADLINE for low-latency UFS
+7. **BPF**: JIT always on, unprivileged BPF disabled
+8. **Debug**: DWARF5 + compressed, function tracer, dynamic ftrace
+9. **Device drivers**: Fingerprint, charger ICs, MI thermal, ANT check, battery auth
+10. **APEX modules**: sysfs control plane + charge control

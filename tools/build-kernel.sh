@@ -3,14 +3,14 @@
 #
 # Base: Zepharo R9 (topnotchfreaks/kernel_msm-5.15, Linux 5.15.170)
 #
-# Usage: ./build-kernel.sh [defconfig] [--clean] [--dry-run]
-#                              [--modules] [--version] [--profile <name>]
-#   defconfig: apex_defconfig (default)
-#   --profile: battery, performance (default: neutral — no fragment)
+# Usage: ./build-kernel.sh [--clean] [--dry-run] [--modules] [--version]
 #   --clean:   force full rebuild (default: incremental)
 #   --dry-run: show what would be done without executing
 #   --modules: only build modules (skip Image)
 #   --version: print version info and exit
+#
+# Profile variants are handled at runtime by rom-overlays/init.d/apex_profiles.rc
+# (sysfs writes on property change) — there are no compile-time profiles.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -19,7 +19,6 @@ KERNEL="$APEX/kernel"
 OUT="$APEX/out"
 
 DEFCONFIG="apex_defconfig"
-PROFILE=""
 DO_CLEAN=0
 DRY_RUN=0
 MODULES_ONLY=0
@@ -32,15 +31,13 @@ while [ $# -gt 0 ]; do
     --dry-run) DRY_RUN=1 ;;
     --modules) MODULES_ONLY=1 ;;
     --version) SHOW_VERSION=1 ;;
-    --profile) shift; PROFILE="${1:-}" ;;
-    battery|balanced|performance) PROFILE="$1" ;;
     *_defconfig) DEFCONFIG="$1" ;;
   esac
   shift
 done
 
 # --- Version info ---
-APEX_VERSION="0.1.0-zepharo"
+APEX_VERSION="0.2.0-zepharo"
 GIT_HASH="$(cd "$APEX" 2>/dev/null && git rev-parse --short HEAD 2>/dev/null || echo 'unknown')"
 BUILD_DATE="$(date '+%Y-%m-%d %H:%M:%S')"
 
@@ -98,7 +95,6 @@ fi
 
 echo "=== APEX kernel build v$APEX_VERSION ==="
 echo "  defconfig: $DEFCONFIG"
-echo "  profile:   ${PROFILE:-neutral}"
 echo "  jobs:      $JOBS"
 echo "  kernel:    $KERNEL"
 echo "  out:       $OUT"
@@ -167,60 +163,32 @@ if [ "$DRY_RUN" -eq 0 ]; then
 fi
 end_phase
 
-# 2. Apply patches from patches/apex-new/ only
+# 2. Apply patches from patches/apex-new/ using the series file
 start_phase "Applying APEX patches"
 if [ "$DRY_RUN" -eq 0 ]; then
-  PATCH_FAILURES=0
-  for patch_dir in "$APEX"/patches/apex-new/*/; do
-    [ -d "$patch_dir" ] || continue
-    if [ -f "$patch_dir/apply.sh" ]; then
-      echo "  applying: $(basename "$patch_dir")"
-      if ! bash "$patch_dir/apply.sh" "$KERNEL"; then
-        echo "  ERROR: $(basename "$patch_dir") apply failed!" >&2
-        PATCH_FAILURES=$((PATCH_FAILURES + 1))
-      fi
-    fi
-  done
-
-  if [ "$PATCH_FAILURES" -gt 0 ]; then
-    echo ">>> $PATCH_FAILURES patch(es) failed. Aborting build." >&2
+  if ! bash "$HERE/apply-patches.sh"; then
+    echo ">>> Patch application failed. Aborting build." >&2
     exit 1
-  fi
-
-  if [ -z "$(ls -A "$APEX/patches/apex-new/" 2>/dev/null)" ]; then
-    echo "  (no patches in patches/apex-new/ — bare base build)"
   fi
 fi
 end_phase
 
-# 3. Merge defconfig fragments (modern stack + optional profile)
-start_phase "Merging defconfig fragments"
-FRAGMENTS=""
+# 3. Prepare configuration.
+#    The tracked apex_defconfig at defconfig/apex_defconfig is the single
+#    source of truth (kernel/ is not in git — it's extracted/checked out
+#    separately). Sync it into the kernel tree before configuring so a
+#    clean checkout builds identically.
+start_phase "Preparing configuration"
 
-# Always apply the modern stack fragment
-MODERN_FRAG="$APEX/defconfig/apex-modern.config"
-if [ -f "$MODERN_FRAG" ]; then
-  FRAGMENTS="$FRAGMENTS $MODERN_FRAG"
-  echo "  modern stack fragment: $MODERN_FRAG"
-fi
-
-# Always apply the security hardening fragment
-SECURITY_FRAG="$APEX/defconfig/apex-security.config"
-if [ -f "$SECURITY_FRAG" ]; then
-  FRAGMENTS="$FRAGMENTS $SECURITY_FRAG"
-  echo "  security fragment: $SECURITY_FRAG"
-fi
-
-if [ -n "$PROFILE" ]; then
-  PROFILE_FRAG="$APEX/defconfig/profile-${PROFILE}.config"
-  if [ -f "$PROFILE_FRAG" ]; then
-    FRAGMENTS="$FRAGMENTS $PROFILE_FRAG"
-    echo "  profile fragment: $PROFILE_FRAG"
-  else
-    echo "  WARNING: profile fragment not found: $PROFILE_FRAG" >&2
+TRACKED_DEFCONFIG="$APEX/defconfig/apex_defconfig"
+if [ -f "$TRACKED_DEFCONFIG" ]; then
+  if [ "$DRY_RUN" -eq 0 ]; then
+    mkdir -p "$KERNEL/arch/arm64/configs"
+    cp "$TRACKED_DEFCONFIG" "$KERNEL/arch/arm64/configs/apex_defconfig"
   fi
+  echo "  synced defconfig/apex_defconfig -> kernel/arch/arm64/configs/apex_defconfig"
 else
-  echo "  (neutral — no profile fragment)"
+  echo "  WARNING: defconfig/apex_defconfig not found — using kernel tree copy" >&2
 fi
 end_phase
 
@@ -229,12 +197,6 @@ start_phase "Configuring kernel"
 if [ "$DRY_RUN" -eq 0 ]; then
   cd "$KERNEL"
   make O="$OUT" ARCH=arm64 CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm "$DEFCONFIG"
-
-  if [ -n "$FRAGMENTS" ]; then
-    ./scripts/kconfig/merge_config.sh -m -r -O "$OUT" \
-      "$OUT/.config" $FRAGMENTS
-    make O="$OUT" ARCH=arm64 CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm olddefconfig </dev/null
-  fi
 fi
 end_phase
 

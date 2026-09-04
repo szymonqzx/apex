@@ -1,0 +1,15 @@
+# APEX kernel patch series
+# Applied in order to the Zepharo R9 base (Linux 5.15.170)
+#
+# Format: <patch-name> <description>
+# Patches are applied by tools/apply-patches.sh
+
+# 1. APEX sysfs control plane — /sys/class/apex/ class
+apex-sysfs           APEX sysfs class and version nodes
+
+# 2. APEX charge control — /sys/class/apex/charge/ tunables
+apex-charge          APEX charge control module (limit, mode, bypass)
+
+# 3. Device-specific driver backports from legacy kernel
+#    Fingerprint, charger ICs, MI thermal, ANT check, battery auth
+apex-device-backports  Topaz device drivers from legacy (fingerprint, chargers, thermal)
