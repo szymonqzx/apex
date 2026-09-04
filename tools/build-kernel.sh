@@ -204,6 +204,13 @@ if [ -f "$MODERN_FRAG" ]; then
   echo "  modern stack fragment: $MODERN_FRAG"
 fi
 
+# Always apply the security hardening fragment
+SECURITY_FRAG="$APEX/defconfig/apex-security.config"
+if [ -f "$SECURITY_FRAG" ]; then
+  FRAGMENTS="$FRAGMENTS $SECURITY_FRAG"
+  echo "  security fragment: $SECURITY_FRAG"
+fi
+
 if [ -n "$PROFILE" ]; then
   PROFILE_FRAG="$APEX/defconfig/profile-${PROFILE}.config"
   if [ -f "$PROFILE_FRAG" ]; then
