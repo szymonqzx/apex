@@ -1,1 +1,0 @@
-obj-$(CONFIG_CPU_FREQ_GOV_APEX) += cpufreq_apex.o

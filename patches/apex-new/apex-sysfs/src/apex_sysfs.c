@@ -15,7 +15,7 @@
 #include <linux/sysfs.h>
 #include <linux/string.h>
 
-#define APEX_VERSION "0.1.0-zepharo"
+#define APEX_VERSION "0.3.0-zepharo"
 #define APEX_BASE "5.15.170 Zepharo R9"
 
 static struct kobject *apex_kobj;
@@ -35,8 +35,8 @@ static ssize_t base_show(struct kobject *kobj, struct kobj_attribute *attr,
 static ssize_t enabled_features_show(struct kobject *kobj,
 				     struct kobj_attribute *attr, char *buf)
 {
-	/* No features actuated by default in v0.1 */
-	return sprintf(buf, "(none)\n");
+	/* Features registered under /sys/class/apex/ */
+	return sprintf(buf, "sysfs charge\n");
 }
 
 static struct kobj_attribute version_attr = __ATTR_RO(version);

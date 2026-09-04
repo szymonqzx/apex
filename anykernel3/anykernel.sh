@@ -4,11 +4,11 @@
 
 ui_print "*******************************************************"
 ui_print " APEX kernel — Redmi Note 12 4G (topaz)"
-ui_print " 5.15.170 Zepharo R9 base (v0.2)"
+ui_print " 5.15.170 Zepharo R9 base (v0.3)"
 ui_print " Modern stack + security + device drivers"
 ui_print "*******************************************************"
 
-kernel.string="APEX kernel v0.2 for topaz (Zepharo R9 base)"
+kernel.string="APEX kernel v0.3 for topaz (Zepharo R9 base)"
 
 do.devicecheck=1
 device.name1=topaz

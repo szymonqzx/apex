@@ -4,6 +4,38 @@ All notable changes to the APEX kernel project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0-zepharo] — planned
+
+### Added
+- **`apex-baseband-guard`**: anti-hard-brick LSM blocking writes to critical
+  partitions (boot, dtbo, vbmeta*, userdata, ...) from untrusted processes.
+  Vendored from `vc-teahouse/Baseband-guard` @ `a54e0dc` (GPL-2.0) with a
+  static 5.15-pinned Makefile; registered via `DEFINE_LSM` (own cred blob,
+  no SELinux objsec patching). `CONFIG_BBG=y` and `baseband_guard` in
+  `CONFIG_LSM`.
+
+### Changed
+- **`apex_charge` now actuates hardware.** The v0.2 module stored
+  `charge_limit_percent`/`charge_mode`/`bypass_charging` as ints and never
+  touched the charger. Rewritten: when capacity reaches the limit the module
+  brakes the main charger's `CURRENT_NOW` (via `power_supply_set_property`),
+  re-asserts every 15 s against the ROM's charger daemons, and applies 3%
+  hysteresis. The fake `charge_mode` and `bypass_charging` knobs (no hardware
+  mapping on topaz) were removed.
+- **Purged redundant experimental systems**: apex-state, apex-governor,
+  apex-watchdog, apex-immortal, apex-lmk, apex-memfreq, apex-cpuboost,
+  apex-thermal-uclamp, apex-display, apex-blx, apex-autoload and the
+  WildKernels patch archive were removed (audit: all have production-tested
+  in-tree/upstream equivalents — WALT input-boost, schedutil, QTI memlat
+  DCVS, QTI thermal cdevs, LMKD).
+- Version bumped to `0.3.0-zepharo` (module + build + package).
+- `build-kernel.sh` no longer generates the dead `patches/apex-state/
+  build-info.h` (nothing included it).
+
+### Security
+- Baseband guard: `CONFIG_BBG_BLOCK_BOOT` / `CONFIG_BBG_BLOCK_RECOVERY`
+  remain off by default (recovery flashing must keep working).
+
 ## [Unreleased]
 
 ### Added

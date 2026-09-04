@@ -1,16 +1,18 @@
 # Fragment appended to drivers/apex/Kconfig by apply.sh (idempotent)
 config APEX_CHARGE
-	tristate "APEX charge control"
+	tristate "APEX charge limiting"
 	depends on APEX_SYSFS && POWER_SUPPLY
 	default m
 	help
-	  APEX charge control module providing sysfs tunables for
-	  charge limiting, mode selection, and bypass charging.
-	  Registers under /sys/class/apex/charge/.
+	  APEX charge limiting module. Stops charging at a user-set
+	  battery percentage by braking the main charger's charge
+	  current through the power_supply framework, re-asserting
+	  periodically against the ROM's charger daemons, with 3%
+	  hysteresis.
 
-	  Exposes charge_limit_percent (80-100 or 0=disabled),
-	  charge_mode (auto/fast/balanced/eco), bypass_charging,
-	  and a read-only status node with JSON-formatted battery
-	  telemetry (capacity, temperature, voltage, current).
+	  Exposes /sys/class/apex/charge/:
+	    charge_limit_percent  - rw (0=disabled, 80-100)
+	    status                - r  (JSON: limit, state, capacity,
+	                                  temperature, voltage, current)
 
 	  If unsure, say M.

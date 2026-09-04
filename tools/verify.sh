@@ -105,6 +105,13 @@ else
   warn "WALT not detected in Image (CONFIG_SCHED_WALT)"
 fi
 
+# --- 5b. Baseband guard ----------------------------------------------------
+if in_image "baseband_guard" || in_image "protect All Block"; then
+  ok "Baseband Guard (anti-brick LSM) compiled in"
+else
+  warn "Baseband Guard not detected in Image (CONFIG_BBG)"
+fi
+
 if in_image "lru_gen"; then
   ok "MGLRU (Multi-Gen LRU) compiled in"
 else

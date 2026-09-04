@@ -15,8 +15,12 @@ while the ROM's ramdisk, DTB, and vendor modules are untouched.
 - **Device drivers**: fingerprint (FPC/Goodix), charger ICs (BQ2589X, SC8551,
   SM5602, LN8000), MI thermal, ANT check, battery authentication — ported from
   the topaz legacy tree
-- **APEX control plane**: `/sys/class/apex/` sysfs class + charge control
-  module (charge limiting, mode, bypass, live battery telemetry)
+- **APEX control plane**: `/sys/class/apex/` sysfs class + charge limiting
+  module that actually stops charging at a user-set % (brakes the charger's
+  `CURRENT_NOW` via the power_supply framework, re-asserted periodically)
+- **Baseband guard**: LSM blocking writes to critical partitions
+  (boot/vbmeta/dtbo/...) from untrusted processes — anti-hard-brick protection
+  (vendored from `vc-teahouse/Baseband-guard`)
 - **Zero-warning build**: all Clang 22 diagnostics resolved; APEX code is
   checkpatch-clean
 
@@ -87,13 +91,13 @@ After boot, the kernel exposes:
 - `/sys/class/apex/base` — base tree
 - `/sys/class/apex/enabled_features` — feature list
 - `/sys/class/apex/charge/charge_limit_percent` — charge limit (80–100, 0=off)
-- `/sys/class/apex/charge/charge_mode` — auto / fast / balanced / eco
-- `/sys/class/apex/charge/bypass_charging` — bypass toggle
-- `/sys/class/apex/charge/status` — JSON battery telemetry
+- `/sys/class/apex/charge/status` — JSON battery telemetry + limit state
 
 ```bash
-# Limit charging to 85%
+# Stop charging at 85% (re-asserted every 15s against the ROM's daemons)
 echo 85 > /sys/class/apex/charge/charge_limit_percent
+# Disable the limit
+echo 0 > /sys/class/apex/charge/charge_limit_percent
 ```
 
 ## Profile switching

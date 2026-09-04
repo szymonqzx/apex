@@ -86,6 +86,36 @@ class TestChargeSourceInvariants(unittest.TestCase):
         self.assertNotIn("current", names,
                          "'current' used as variable — conflicts with kernel macro")
 
+    def test_brake_actuation(self):
+        """The limit must actually actuate hardware via power_supply_set_property
+        with CURRENT_NOW (regression: v0.2 module stored ints and did nothing)."""
+        self.assertIn("power_supply_set_property", self.text,
+                      "Must call power_supply_set_property to actuate charging")
+        self.assertIn("POWER_SUPPLY_PROP_CURRENT_NOW", self.text,
+                      "Brake must set charge current (CURRENT_NOW)")
+        self.assertIn("BRAKE_CURRENT_UA", self.text,
+                      "Must define a brake (zero) current")
+
+    def test_reassert_workqueue(self):
+        """Limit must be re-asserted periodically (ROM daemons override)."""
+        self.assertIn("queue_delayed_work", self.text,
+                      "Must schedule periodic re-assert")
+        self.assertIn("charge_apply_policy", self.text,
+                      "Must have a policy-apply function")
+
+    def test_hysteresis(self):
+        """Must apply hysteresis to prevent chatter at the boundary."""
+        self.assertIn("LIMIT_HYSTERESIS_PCT", self.text,
+                      "Must define hysteresis")
+
+    def test_no_fake_knobs(self):
+        """charge_mode / bypass_charging were no-op knobs with no hardware
+        mapping — they must not be exposed (regression guard)."""
+        self.assertNotIn("charge_mode", self.text,
+                         "charge_mode had no hardware mapping and was removed")
+        self.assertNotIn("bypass_charging", self.text,
+                         "bypass_charging had no hardware mapping and was removed")
+
 
 if __name__ == "__main__":
     unittest.main()

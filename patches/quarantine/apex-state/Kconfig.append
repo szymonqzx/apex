@@ -1,7 +1,0 @@
-config APEX
-	bool "apex control plane"
-	help
-	  In-kernel apex state machine: /proc/apex/* status surface,
-	  16-row decision table over (screen, charging, audio, fg-uid),
-	  RTC wakealarm mirror, 5-minute health tick, panic incident ring.
-	  Built-in (not a module): the surface must exist before userspace.

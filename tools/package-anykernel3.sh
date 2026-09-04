@@ -8,7 +8,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APEX="$(cd "$HERE/.." && pwd)"
 OUT="$APEX/out"
 AK3="$APEX/anykernel3"
-VERSION="0.2.0-zepharo"
+VERSION="0.3.0-zepharo"
 ZIP_NAME="apex-kernel-${VERSION}-anykernel3.zip"
 ZIP_DIR="/tmp/apex-ak3-build"
 
