@@ -193,9 +193,16 @@ if [ "$DRY_RUN" -eq 0 ]; then
 fi
 end_phase
 
-# 3. Merge defconfig fragments (profile only — base is in apex_defconfig)
+# 3. Merge defconfig fragments (modern stack + optional profile)
 start_phase "Merging defconfig fragments"
 FRAGMENTS=""
+
+# Always apply the modern stack fragment
+MODERN_FRAG="$APEX/defconfig/apex-modern.config"
+if [ -f "$MODERN_FRAG" ]; then
+  FRAGMENTS="$FRAGMENTS $MODERN_FRAG"
+  echo "  modern stack fragment: $MODERN_FRAG"
+fi
 
 if [ -n "$PROFILE" ]; then
   PROFILE_FRAG="$APEX/defconfig/profile-${PROFILE}.config"
@@ -214,12 +221,12 @@ end_phase
 start_phase "Configuring kernel"
 if [ "$DRY_RUN" -eq 0 ]; then
   cd "$KERNEL"
-  make O="$OUT" ARCH=arm64 CC=clang "$DEFCONFIG"
+  make O="$OUT" ARCH=arm64 CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm "$DEFCONFIG"
 
   if [ -n "$FRAGMENTS" ]; then
     ./scripts/kconfig/merge_config.sh -m -r -O "$OUT" \
       "$OUT/.config" $FRAGMENTS
-    make O="$OUT" ARCH=arm64 CC=clang olddefconfig </dev/null
+    make O="$OUT" ARCH=arm64 CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm olddefconfig </dev/null
   fi
 fi
 end_phase
