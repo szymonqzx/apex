@@ -12,6 +12,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import com.apex.control.agent.AgentChatSurface
+import com.apex.control.agent.AgentDebugLogViewer
+import com.apex.control.agent.AuditLogViewer
+import com.apex.control.agent.ModelDownloadManager
+import com.apex.control.agent.ModelRouterScreen
 import com.apex.control.domain.ApexRepository
 import com.apex.control.domain.ApexState
 import kotlinx.coroutines.launch
@@ -21,6 +26,8 @@ import kotlinx.coroutines.launch
  *
  * Observes state from ApexRepository and renders cards for each subsystem.
  * Includes the trust badge and gate results from the certification platform.
+ *
+ * Tab layout: System (original controls) | Agent | Model | Audit | Debug
  */
 @Composable
 fun ApexControlScreen(
@@ -33,6 +40,8 @@ fun ApexControlScreen(
     var kcalB by rememberSaveable { mutableStateOf(255) }
     val scope = rememberCoroutineScope()
     val incidentListState = rememberLazyListState()
+    var selectedTab by rememberSaveable { mutableStateOf(0) }
+    val tabs = listOf("System", "Agent", "Model", "Audit", "Debug")
 
     // Fetch full state snapshot
     fun refreshAll() {
@@ -101,6 +110,64 @@ fun ApexControlScreen(
 
         HorizontalDivider()
 
+        // Tab row
+        TabRow(selectedTabIndex = selectedTab) {
+            tabs.forEachIndexed { index, title ->
+                Tab(
+                    selected = selectedTab == index,
+                    onClick = { selectedTab = index },
+                    text = { Text(title) },
+                )
+            }
+        }
+
+        // Tab content
+        when (selectedTab) {
+            0 -> {
+                // System tab (original controls)
+                SystemTabContent(
+                    state = state,
+                    gamingMode = gamingMode,
+                    kcalR = kcalR,
+                    kcalG = kcalG,
+                    kcalB = kcalB,
+                    repository = repository,
+                    scope = scope,
+                    incidentListState = incidentListState,
+                    onRefresh = { refreshAll() },
+                    onGamingModeChange = { gamingMode = it },
+                    onKcalRChange = { kcalR = it },
+                    onKcalGChange = { kcalG = it },
+                    onKcalBChange = { kcalB = it },
+                )
+            }
+            1 -> AgentChatSurface()
+            2 -> ModelRouterScreen()
+            3 -> AuditLogViewer()
+            4 -> AgentDebugLogViewer()
+        }
+    }
+}
+
+@Composable
+private fun SystemTabContent(
+    state: ApexState,
+    gamingMode: Boolean,
+    kcalR: Int,
+    kcalG: Int,
+    kcalB: Int,
+    repository: ApexRepository,
+    scope: kotlinx.coroutines.CoroutineScope,
+    incidentListState: androidx.compose.foundation.lazy.LazyListState,
+    onRefresh: () -> Unit,
+    onGamingModeChange: (Boolean) -> Unit,
+    onKcalRChange: (Int) -> Unit,
+    onKcalGChange: (Int) -> Unit,
+    onKcalBChange: (Int) -> Unit,
+) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
         // Gaming mode toggle
         Card(modifier = Modifier.fillMaxWidth()) {
             Row(
@@ -124,7 +191,7 @@ fun ApexControlScreen(
                         scope.launch {
                             val ok = repository.setGamingMode(enabled)
                             if (ok) {
-                                gamingMode = enabled
+                                onGamingModeChange(enabled)
                             }
                         }
                     }
@@ -137,7 +204,7 @@ fun ApexControlScreen(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.End
         ) {
-            OutlinedButton(onClick = { refreshAll() }) {
+            OutlinedButton(onClick = onRefresh) {
                 Text("Refresh")
             }
         }
@@ -203,20 +270,20 @@ fun ApexControlScreen(
                     fontFamily = FontFamily.Monospace
                 )
                 KcalSlider("R", kcalR, repository) { newR ->
-                    kcalR = newR
-                    scope.launch { repository.setKcal(kcalR, kcalG, kcalB) }
+                    onKcalRChange(newR)
+                    scope.launch { repository.setKcal(newR, kcalG, kcalB) }
                 }
                 KcalSlider("G", kcalG, repository) { newG ->
-                    kcalG = newG
-                    scope.launch { repository.setKcal(kcalR, kcalG, kcalB) }
+                    onKcalGChange(newG)
+                    scope.launch { repository.setKcal(kcalR, newG, kcalB) }
                 }
                 KcalSlider("B", kcalB, repository) { newB ->
-                    kcalB = newB
-                    scope.launch { repository.setKcal(kcalR, kcalG, kcalB) }
+                    onKcalBChange(newB)
+                    scope.launch { repository.setKcal(kcalR, kcalG, newB) }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = {
-                        kcalR = 255; kcalG = 255; kcalB = 255
+                        onKcalRChange(255); onKcalGChange(255); onKcalBChange(255)
                         scope.launch { repository.setKcal(255, 255, 255) }
                     }) {
                         Text("Reset")

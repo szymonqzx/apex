@@ -1,0 +1,24 @@
+cc_library_shared {
+    name: "libwhisper_jni",
+    srcs: ["whisper_jni.c"],
+    include_dirs: [
+        "external/whisper.cpp",
+    ],
+    shared_libs: [
+        "liblog",
+    ],
+    static_libs: [
+        "libwhisper",
+    ],
+    arch: {
+        arm64: {
+            cflags: ["-D__ARM_NEON"],
+        },
+    },
+    target: {
+        android: {
+            cflags: ["-O2", "-Wall", "-Werror"],
+        },
+    },
+    sdk_version: "current",
+}

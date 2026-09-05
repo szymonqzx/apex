@@ -1,0 +1,86 @@
+// agent/Android.bp — Soong build file for the APEX agent module
+//
+// Compiles AIDL interfaces, Java system service components, JNI library,
+// and SELinux policy. Matches AOSP/LineageOS build conventions.
+
+aidl_interface {
+  name: "com.apex.agent-aidl",
+  srcs: [
+    "aidl/com/apex/agent/IApexAgent.aidl",
+    "aidl/com/apex/agent/IApexToolCallback.aidl",
+    "aidl/com/apex/agent/ApexAgentStatus.aidl",
+  ],
+  unstable: true,
+  backend: {
+    java: {
+      enabled: true,
+    },
+    cpp: {
+      enabled: false,
+    },
+    ndk: {
+      enabled: false,
+    },
+  },
+}
+
+java_library_static {
+  name: "apex-agent-service",
+  srcs: [
+    "java/com/apex/agent/ApexAgentStatus.java",
+    "java/com/apex/agent/LlmManagerService.java",
+    "java/com/apex/agent/McpRegistry.java",
+    "java/com/apex/agent/ConsentGate.java",
+    "java/com/apex/agent/HitlConsentStore.java",
+  ],
+  static_libs: [
+    "com.apex.agent-aidl",
+  ],
+  libs: [
+    "framework",
+    "services",
+  ],
+  optimize: {
+    enabled: true,
+  },
+}
+
+java_binary {
+  name: "apexagentd",
+  srcs: [
+    "java/com/apex/agent/ApexAgentDaemon.java",
+  ],
+  static_libs: [
+    "apex-agent-service",
+    "com.apex.agent-aidl",
+  ],
+  init_rc: [
+    "rom-overlays/init.d/apex_agent.rc",
+  ],
+}
+
+// SELinux policy
+se_policy_conf {
+  name: "apex_agent_sepolicy",
+  srcs: [
+    "sepolicy/apex_agent.te",
+  ],
+}
+
+// JNI library for llama.cpp bridge
+cc_library_shared {
+  name: "libllm_jni",
+  srcs: [
+    "llm/libllm_jni/llm_jni.c",
+  ],
+  shared_libs: [
+    "libllama",
+    "liblog",
+    "libdl",
+  ],
+  include_dirs: [
+    "external/llama.cpp/include",
+  ],
+  compile_multilib: "64",
+  stl: "c++_static",
+}

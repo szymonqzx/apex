@@ -1,0 +1,28 @@
+// libllm_jni/Android.bp — Soong build for the JNI bridge library
+// Compiled as a shared library for arm64-v8a only.
+
+cc_library_shared {
+  name: "libllm_jni",
+  srcs: [
+    "llm_jni.c",
+  ],
+  shared_libs: [
+    "libllama",
+    "liblog",
+    "libdl",
+  ],
+  include_dirs: [
+    "external/llama.cpp/include",
+  ],
+  compile_multilib: "64",
+  stl: "c++_static",
+  arch: {
+    arm64: {
+      cflags: [
+        "-O3",
+        "-fPIC",
+        "-DGGML_USE_NEON",
+      ],
+    },
+  },
+}

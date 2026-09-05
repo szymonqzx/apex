@@ -1,0 +1,73 @@
+# apex_agent.te — SELinux policy for the APEX agent daemon
+#
+# Based on the existing apex_chown.te pattern in rom-overlays/selinux/.
+# Strictly enforcing — all domains are enforced, none are relaxed.
+#
+# The agent daemon (apexagentd) runs in its own process with its own
+# SELinux domain. This ensures process isolation: a crash in the agent
+# cannot take down system_server.
+#
+# Permissions:
+# - Binder IPC to system_server (for McpRegistry, ConsentGate)
+# - Local socket at /dev/socket/apex-agent
+# - Read/write access to data_system_apex (consent audit store)
+# - Execute llama.cpp library (libllm.so, libwhisper.so)
+# - Read model files from /data/local/tmp/models/
+# - Read sysfs (power_supply, apex) for MCP tool execution
+# - Read procfs (/proc/apex/, /proc/mounts) for MCP tool execution
+
+type apex_agent, domain;
+type apex_agent_exec, file_type, exec_type;
+
+# Domain transition from init
+init_daemon_domain(apex_agent)
+
+# Binder IPC to system_server
+binder_call(apex_agent, system_server)
+binder_call(system_server, apex_agent)
+binder_use(apex_agent)
+
+# Service manager registration
+allow apex_agent servicemanager:binder call;
+
+# Local socket for agent communication
+type apex_agent_socket, file_type;
+allow apex_agent apex_agent_socket:sock_file create_file_perms;
+allow apex_agent apex_agent_socket:socket { create bind listen accept read write };
+
+# Consent audit store — data_system type for /data/system/apex/
+type data_system_apex, file_type, data_file_type;
+allow apex_agent data_system_apex:dir { create_dir_perms };
+allow apex_agent data_system_apex:file { create_file_perms rw_file_perms };
+
+# Model files (GGUF)
+allow apex_agent apk_data_file:dir { search read };
+allow apex_agent apk_data_file:file { read open };
+
+# Sysfs reads for MCP tools (read-only)
+allow apex_agent sysfs_power:dir { search read };
+allow apex_agent sysfs_power:file { read open };
+allow apex_agent sysfs_apex:dir { search read };
+allow apex_agent sysfs_apex:file { read open };
+
+# Procfs reads for MCP tools (read-only)
+allow apex_agent proc_apex:dir { search read };
+allow apex_agent proc_apex:file { read open };
+allow apex_agent proc_mounts:file { read open };
+
+# Execute native libraries (llama.cpp, whisper.cpp)
+allow apex_agent system_lib_file:dir { search read };
+allow apex_agent system_lib_file:file { read open execute };
+
+# Log access
+allow apex_agent logd:unix_stream_socket { connect write };
+
+# Never allow writes to boot-critical partitions
+neverallow apex_agent block_device:blk_file { write append };
+
+# Never allow capability escalation
+neverallow apex_agent self:capability { sys_admin sys_module };
+
+# No network access (all inference is on-device)
+neverallow apex_agent self:tcp_socket { create bind listen accept };
+neverallow apex_agent self:udp_socket { create bind listen accept };

@@ -1,0 +1,33 @@
+# apex_update_engine.rc — Init RC for A/B update engine service
+#
+# Manages Virtual A/B updates: writes payloads to inactive slot,
+# triggers reboot, handles rollback.
+#
+# Part of the APEX ROM update architecture (docs/UPDATE_ARCHITECTURE.md).
+
+service apex_update_engine /system/bin/update_engine
+  class core
+  user system
+  group system
+  capabilities NET_BIND_SERVICE
+  critical
+  seclabel u:r:apex_update_engine:s0
+
+on init
+  mkdir /data/apex 0750 system system
+  mkdir /data/apex/updates 0750 system system
+
+on boot
+  # Run A/B verification gate on every boot
+  # apex_ab_verify.sh checks if we're on a new slot and verifies it
+  exec - system system -- /system/bin/apex_ab_verify.sh
+
+on property:ro.boot.slot_suffix=*
+  # Ensure verification runs after slot is determined
+  start apex_update_engine
+
+# Property to trigger an A/B update
+on property:apex.update.apply=1
+  exec - system system -- /system/bin/apex_apply_update.sh ${apex.update.payload}
+  setprop apex.update.apply 0
+  setprop apex.update.result ${apex.update.apply.result}
