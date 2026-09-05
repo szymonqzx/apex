@@ -4,10 +4,14 @@
 # Detects whether the running kernel is the APEX kernel.
 # Sets system properties for Apex Control to display a badge/notice.
 #
-# The ROM WARNS (never refuses) when not running the APEX kernel:
+# The ROM WARNS (never blocks boot) when not running the APEX kernel:
 # - Sets ro.apex.kernel to "apex" or "stock"
 # - Writes a dmesg flag for diagnostics
 # - Sets ro.apex.kernel_notice for the boot notice text
+#
+# Design decision: APEX kernel is a clean drop-in for LineageOS 23.2.
+# The ROM boots on any compatible kernel but warns when APEX kernel
+# features (agent, charging, tuning, chroot) are unavailable.
 #
 # Brick-safety: READ-ONLY. No writes to any partition or sysfs.
 set -euo pipefail

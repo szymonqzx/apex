@@ -5,6 +5,22 @@
 The APEX ROM uses a **dual update path**: Virtual A/B seamless updates (primary)
 with auto-fallback, and a LineageOS OTA-style zip (emergency fallback).
 
+## APEX Kernel Compatibility
+
+The APEX kernel is a **clean drop-in for LineageOS 23.2** — it boots on a
+stock LineageOS 23.2 installation without any ROM-side modifications. This
+is a core design principle:
+
+- **APEX kernel → clean LOS 23.2**: Works as a drop-in replacement kernel.
+  The kernel is self-contained (KernelSU-Next + SuSFS + schedhorizon + charge
+  threshold) and does not require any ROM-side patches to boot.
+- **APEX ROM → APEX kernel**: The ROM requires the APEX kernel for full
+  functionality (agent, charging, tuning, chroot). Without it, the ROM
+  **warns** (boot notice, dmesg flag, Apex Control badge) but never blocks boot.
+- **Test**: `rom-overlays/init.d/apex_kernel_detect.sh` detects the APEX kernel
+  via `/proc/version` marker and `/proc/apex/version` sysfs node. The detection
+  script is read-only and sets system properties for the UI badge.
+
 ## Virtual A/B (Primary)
 
 ### Device Support

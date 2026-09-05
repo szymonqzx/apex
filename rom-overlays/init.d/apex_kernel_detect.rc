@@ -2,8 +2,7 @@
 #
 # Init script for APEX kernel detection at boot.
 # Sets properties that Apex Control reads to display a badge/notice.
-# The ROM WARNS (never refuses) when not running the APEX kernel.
-#
+# The ROM WARNS (never blocks boot) when not running the APEX kernel:#
 # Brick-safety: read-only — only reads /proc/version and sets properties.
 
 on early-boot
