@@ -106,6 +106,10 @@ public class LlmManagerService extends IApexAgent.Stub {
     mModels.put("qwen2.5-3b", new ModelEntry(
         "qwen2.5-3b", "Qwen 2.5 3B", "medium", 2200,
         "/data/local/tmp/models/qwen2.5-3b-q4_k_m.gguf"));
+    // Remote model (OmniRoute-compatible) — opt-in per request
+    mModels.put("remote-omniroute", new ModelEntry(
+        "remote-omniroute", "Remote (OmniRoute)", "remote", 0,
+        null));
   }
 
   public void publish() {
@@ -308,6 +312,7 @@ public class LlmManagerService extends IApexAgent.Stub {
       case "nano": return "qwen2.5-0.5b";
       case "small": return "qwen2.5-1.5b";
       case "medium": return "qwen2.5-3b";
+      case "remote": return "remote-omniroute";
       default: return null;
     }
   }

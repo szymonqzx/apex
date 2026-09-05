@@ -26,6 +26,13 @@ public class ModelManager {
   public static final String TIER_DEFAULT = "qwen2.5-1.5b";
   public static final String TIER_HIGH = "qwen2.5-3b";
 
+  // Remote model tier (OmniRoute-compatible) — opt-in per request
+  public static final String TIER_REMOTE = "remote-omniroute";
+  private static final String REMOTE_DEFAULT_URL = "http://127.0.0.1:20128/v1/chat/completions";
+  private static final String REMOTE_DEFAULT_MODEL = "qwen2.5-7b";
+  private String mRemoteEndpoint = REMOTE_DEFAULT_URL;
+  private String mRemoteModel = REMOTE_DEFAULT_MODEL;
+
   // Model storage path
   private static final String MODEL_DIR = "/data/local/tmp/models";
 
@@ -53,6 +60,10 @@ public class ModelManager {
         TIER_HIGH, "Qwen 2.5 3B Q4_K_M",
         MODEL_DIR + "/qwen2.5-3b-q4_k_m.gguf",
         2200, 3300, "3-5"));
+    // Remote model entry — no local file, runtime depends on network
+    MODELS.put(TIER_REMOTE, new ModelInfo(
+        TIER_REMOTE, "Remote (OmniRoute)",
+        null, 0, 0, "network-dependent"));
   }
 
   public ModelManager() {
@@ -96,6 +107,12 @@ public class ModelManager {
       }
 
       // Load via JNI
+      if (TIER_REMOTE.equals(tier)) {
+        // Remote model — no local loading needed, just mark as active
+        mCurrentTier = tier;
+        Log.i(TAG, "Remote model tier selected: " + mRemoteEndpoint + " model=" + mRemoteModel);
+        return true;
+      }
       if (mJniAvailable) {
         try {
           mModelHandle = nativeLoadModel(info.path, mActiveThreads);
@@ -274,6 +291,120 @@ public class ModelManager {
       this.runtimeRamMb = runtimeRamMb;
       this.throughputTokPerSec = throughputTokPerSec;
     }
+  }
+
+  // ── Remote model support (OmniRoute-compatible) ─────────────────
+
+  /**
+   * Configure the remote model endpoint.
+   * @param endpoint URL of the OmniRoute-compatible API (e.g. http://127.0.0.1:20128/v1/chat/completions)
+   * @param model    Model name to use on the remote endpoint
+   */
+  public void configureRemote(String endpoint, String model) {
+    mRemoteEndpoint = endpoint;
+    mRemoteModel = model;
+    Log.i(TAG, "Remote configured: " + endpoint + " model=" + model);
+  }
+
+  /**
+   * Generate a response using the remote model endpoint.
+   * Falls back to local model on network failure.
+   *
+   * NOTE: Remote inference sends data off-device. The caller MUST verify
+   * that the user has given explicit per-request consent for remote use.
+   */
+  public String generateRemote(String prompt, int maxTokens, float temperature) {
+    if (!TIER_REMOTE.equals(mCurrentTier)) {
+      Log.w(TAG, "Remote generation called but remote tier not active");
+      return generateLocal(prompt, maxTokens, temperature);
+    }
+    try {
+      java.net.URL url = new java.net.URL(mRemoteEndpoint);
+      java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
+      conn.setRequestMethod("POST");
+      conn.setRequestProperty("Content-Type", "application/json");
+      conn.setConnectTimeout(10000);
+      conn.setReadTimeout(30000);
+
+      // Build OpenAI-compatible request body
+      org.json.JSONObject body = new org.json.JSONObject();
+      body.put("model", mRemoteModel);
+      org.json.JSONArray messages = new org.json.JSONArray();
+      org.json.JSONObject msg = new org.json.JSONObject();
+      msg.put("role", "user");
+      msg.put("content", prompt);
+      messages.put(msg);
+      body.put("messages", messages);
+      body.put("max_tokens", maxTokens);
+      body.put("temperature", (double) temperature);
+      body.put("stream", false);
+
+      conn.setDoOutput(true);
+      java.io.OutputStream os = conn.getOutputStream();
+      os.write(body.toString().getBytes("UTF-8"));
+      os.flush();
+      os.close();
+
+      int responseCode = conn.getResponseCode();
+      if (responseCode != 200) {
+        Log.w(TAG, "Remote returned " + responseCode + " — falling back to local");
+        return generateLocal(prompt, maxTokens, temperature);
+      }
+
+      java.io.BufferedReader reader = new java.io.BufferedReader(
+          new java.io.InputStreamReader(conn.getInputStream(), "UTF-8"));
+      StringBuilder sb = new StringBuilder();
+      String line;
+      while ((line = reader.readLine()) != null) {
+        sb.append(line);
+      }
+      reader.close();
+
+      org.json.JSONObject response = new org.json.JSONObject(sb.toString());
+      org.json.JSONArray choices = response.optJSONArray("choices");
+      if (choices != null && choices.length() > 0) {
+        org.json.JSONObject choice = choices.getJSONObject(0);
+        org.json.JSONObject msgObj = choice.optJSONObject("message");
+        if (msgObj != null) {
+          return msgObj.optString("content", "");
+        }
+      }
+      Log.w(TAG, "Remote response had no choices — falling back to local");
+      return generateLocal(prompt, maxTokens, temperature);
+    } catch (Exception e) {
+      Log.w(TAG, "Remote generation failed: " + e.getMessage() + " — falling back to local");
+      return generateLocal(prompt, maxTokens, temperature);
+    }
+  }
+
+  /**
+   * Generate using local JNI model (or stub if JNI unavailable).
+   */
+  public String generateLocal(String prompt, int maxTokens, float temperature) {
+    synchronized (mLock) {
+      if (mModelHandle == 0 || !mJniAvailable) {
+        return "[stub] Model inference not available (JNI not loaded).";
+      }
+      try {
+        return nativeGenerate(mModelHandle, prompt, maxTokens, temperature);
+      } catch (UnsatisfiedLinkError e) {
+        return "[stub] Model inference not available (JNI not loaded).";
+      }
+    }
+  }
+
+  /**
+   * Check if the current tier is the remote model.
+   */
+  public boolean isRemoteTier() {
+    return TIER_REMOTE.equals(mCurrentTier);
+  }
+
+  /**
+   * Get the configured remote endpoint URL.
+   */
+  public String getRemoteEndpoint() {
+    return mRemoteEndpoint;
   }
 
   // ── JNI method declarations ─────────────────────────────────────

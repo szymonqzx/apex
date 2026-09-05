@@ -1,0 +1,56 @@
+# rom-overlays/device/apex_ab_ota_config.txt
+#
+# Virtual A/B OTA configuration for APEX ROM on topaz/tapas.
+# This file documents the A/B slot configuration and update flow.
+# It is consumed by the update_engine and apex_ab_verify.sh.
+
+# ── Device A/B partition layout ───────────────────────────────────
+# topaz/tapas uses Virtual A/B (snapshot updates) on UFS 2.2 storage.
+#
+# Slots: _a (active) and _b (inactive/backup)
+# Partitions with A/B suffixes:
+#   boot_a / boot_b
+#   system_a / system_b (virtual — snapshot via dm-snapshot)
+#   vendor_a / vendor_b (virtual — snapshot)
+#   product_a / product_b (virtual — snapshot)
+#
+# Partitions WITHOUT A/B (shared, never touched by OTA):
+#   userdata (user data — preserved across updates)
+#   cache (recovery cache)
+#   persist (persisted properties)
+#   modem (radio firmware — NOT touched by APEX OTA)
+#   bootloader (NOT touched — brick-safety constraint)
+#   aboot (NOT touched — brick-safety constraint)
+#   tz (NOT touched — brick-safety constraint)
+#   hyp (NOT touched — brick-safety constraint)
+#   sbl (NOT touched — brick-safety constraint)
+
+# ── Update flow ───────────────────────────────────────────────────
+# 1. update_engine writes new images to inactive slot
+# 2. apex_ab_verify.sh runs in post-install:
+#    a. Verify slot bootability (kernel Image header check)
+#    b. Verify SELinux policy loads
+#    c. Verify apex.agent service starts
+#    d. Verify system_server starts
+# 3. If verification passes: mark slot active (bootctl set-active-slot)
+# 4. Reboot into new slot
+# 5. On boot: verify system is functional (boot_completed + health check)
+# 6. If boot fails 3 times: auto-rollback to previous slot
+# 7. If boot succeeds: commit snapshot (cancel-rollback)
+
+# ── Rollback safety ───────────────────────────────────────────────
+# - dm-snapshot keeps the old state until commit
+# - If new slot fails to boot, bootloader auto-falls back to previous slot
+# - Manual rollback: `bootctl set-active-slot _a` (or _b)
+# - No user data is touched during any update or rollback
+
+# ── OTA fallback (emergency) ──────────────────────────────────────
+# If Virtual A/B is unavailable (e.g., insufficient COW space):
+# apex_ota_fallback.sh generates a traditional LineageOS OTA zip
+# that can be flashed via recovery. This is the emergency path only.
+
+# ── Brick-safety constraints (grep-verifiable) ────────────────────
+# NEVER write to: bootloader, aboot, tz, hyp, sbl, modem, persist
+# NEVER modify partition tables (GPT)
+# NEVER flash via fastboot flash bootloader or fastboot flash aboot
+# Only update: boot, system, vendor, product (via A/B slots or recovery)
