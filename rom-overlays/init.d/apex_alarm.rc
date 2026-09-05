@@ -1,0 +1,26 @@
+# rom-overlays/init.d/apex_alarm.rc
+#
+# APEX AlarmKeeper — mirrors RTC_WAKEUP alarms to /proc/apex/wakealarm
+# so the kernel can program the PMIC RTC even when the SoC is off.
+#
+# Three alarm paths (DESIGN.md §10.5):
+#   1. deskclock + poweroffalarm pinned to oom_score_adj = -1000 (kernel)
+#   2. apex-alarmkeeper mirrors RTC_WAKEUP → /proc/apex/wakealarm (this service)
+#   3. Kernel writes /sys/class/rtc/rtc0/wakealarm → PMIC fires (kernel)
+#
+# This service is the userspace bridge between Android AlarmManager
+# and the kernel wakealarm procfs entry.
+
+service apex-alarmkeeper /system/bin/apex-alarmkeeper
+    class core
+    user system
+    group system
+    capabilities WAKE_ALARM
+    onrestart restart
+    # Don't start until boot is complete
+    on property:sys.boot_completed=1
+    start apex-alarmkeeper
+
+on property:sys.boot_completed=1
+    # Set alarmkeeper as high-priority (not OOM-killable)
+    write /proc/$(pidof apex-alarmkeeper)/oom_score_adj -1000 2>/dev/null

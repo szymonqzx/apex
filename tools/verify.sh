@@ -252,7 +252,7 @@ for script in apex_agent.rc apex_kernel_detect.rc apex_game_space.rc \
               apex_notifications.rc apex_reboot.rc apex_power_user.rc \
               apex_tuning.rc apex_power.rc apex_profiles.rc \
               apex_wm.rc apex_desktop.rc apex_remote_proxy.rc \
-              apex_modules.rc apex_lindroid.rc; do
+              apex_modules.rc apex_lindroid.rc apex_alarm.rc; do
   if [ -f "$APEX/rom-overlays/init.d/$script" ]; then
     ok "  init.d/$script"
   else
@@ -351,7 +351,9 @@ done
 # Check Apex Control app new screens
 for file in "poweruser/GovernorTuningScreen.kt" \
             "poweruser/ThermalProfileScreen.kt" \
-            "poweruser/IncidentLogViewer.kt"; do
+            "poweruser/IncidentLogViewer.kt" \
+            "poweruser/ModuleStatusScreen.kt" \
+            "poweruser/BridgeStatusScreen.kt"; do
   if [ -f "$APEX/apps/apex-control/app/src/main/java/com/apex/control/$file" ]; then
     ok "  apex-control/$file"
   else
@@ -360,11 +362,40 @@ for file in "poweruser/GovernorTuningScreen.kt" \
 done
 
 # Check build tools
-for tool in package-rom.sh build-scrcpy-server.sh build-lindroid.sh package-hiding-stack.sh; do
+for tool in package-rom.sh build-scrcpy-server.sh build-lindroid.sh \
+            package-hiding-stack.sh build-pentest-drivers.sh verify-stealth.sh; do
   if [ -f "$APEX/tools/$tool" ]; then
     ok "  tools/$tool"
   else
     fail "  tools/$tool missing"
+  fi
+done
+
+# Check NFCForge app
+for file in "app/src/main/AndroidManifest.xml" \
+            "app/build.gradle.kts" \
+            "app/src/main/java/com/apex/nfcforge/data/BridgeClient.kt" \
+            "app/src/main/java/com/apex/nfcforge/domain/NfcModels.kt" \
+            "app/src/main/java/com/apex/nfcforge/ui/MainScreen.kt" \
+            "app/src/main/java/com/apex/nfcforge/ui/MainActivity.kt"; do
+  if [ -f "$APEX/apps/nfcforge/$file" ]; then
+    ok "  nfcforge/$file"
+  else
+    fail "  nfcforge/$file missing"
+  fi
+done
+
+# Check PTK TUI app
+for file in "app/src/main/AndroidManifest.xml" \
+            "app/build.gradle.kts" \
+            "app/src/main/java/com/apex/ptk/data/TerminalSession.kt" \
+            "app/src/main/java/com/apex/ptk/ui/TerminalScreen.kt" \
+            "app/src/main/java/com/apex/ptk/ui/TerminalViewModel.kt" \
+            "app/src/main/java/com/apex/ptk/ui/MainActivity.kt"; do
+  if [ -f "$APEX/apps/ptk-tui/$file" ]; then
+    ok "  ptk-tui/$file"
+  else
+    fail "  ptk-tui/$file missing"
   fi
 done
 

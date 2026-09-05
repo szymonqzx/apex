@@ -232,7 +232,101 @@ if [ "$DRY_RUN" -eq 0 ]; then
 fi
 end_phase
 
-# Phase 6: Build ROM
+# Phase 6: Install APEX WM overlay into LOS build
+start_phase "Installing APEX WM framework overlay"
+if [ "$DRY_RUN" -eq 0 ]; then
+  if [ -d "$APEX/wm/overlay" ]; then
+    mkdir -p "$LOS_SOURCE/vendor/apex/wm/overlay"
+    cp -r "$APEX/wm/overlay/"* "$LOS_SOURCE/vendor/apex/wm/overlay/"
+    echo "  WM overlay installed (ApexWmOverlay.apk)"
+  fi
+  # WM AIDL + Java sources
+  if [ -d "$APEX/wm/aidl" ]; then
+    mkdir -p "$LOS_SOURCE/vendor/apex/wm/aidl"
+    cp -r "$APEX/wm/aidl/"* "$LOS_SOURCE/vendor/apex/wm/aidl/"
+  fi
+  if [ -d "$APEX/wm/java" ]; then
+    mkdir -p "$LOS_SOURCE/vendor/apex/wm/java"
+    cp -r "$APEX/wm/java/"* "$LOS_SOURCE/vendor/apex/wm/java/"
+  fi
+  # WM SELinux
+  for te_file in "$APEX"/wm/sepolicy/*.te; do
+    [ -f "$te_file" ] || continue
+    cp "$te_file" "$LOS_SOURCE/system/sepolicy/vendor/" 2>/dev/null || true
+  done
+fi
+end_phase
+
+# Phase 7: Install Desktop Mode (scrcpy) into LOS build
+start_phase "Installing Desktop Mode (scrcpy)"
+if [ "$DRY_RUN" -eq 0 ]; then
+  if [ -d "$APEX/desktop" ]; then
+    mkdir -p "$LOS_SOURCE/vendor/apex/desktop"
+    cp -r "$APEX/desktop/aidl" "$LOS_SOURCE/vendor/apex/desktop/"
+    cp -r "$APEX/desktop/java" "$LOS_SOURCE/vendor/apex/desktop/"
+    # Pre-built scrcpy server jar (if available)
+    if [ -f "$APEX/desktop/scrcpy-server/scrcpy-server.jar" ]; then
+      mkdir -p "$LOS_SOURCE/device/xiaomi/topaz/prebuilt/bin/"
+      cp "$APEX/desktop/scrcpy-server/scrcpy-server.jar" \
+         "$LOS_SOURCE/device/xiaomi/topaz/prebuilt/bin/"
+    fi
+    # SELinux
+    for te_file in "$APEX"/desktop/sepolicy/*.te; do
+      [ -f "$te_file" ] || continue
+      cp "$te_file" "$LOS_SOURCE/system/sepolicy/vendor/" 2>/dev/null || true
+    done
+    echo "  Desktop Mode installed"
+  fi
+fi
+end_phase
+
+# Phase 8: Install Lindroid into LOS build
+start_phase "Installing Lindroid container support"
+if [ "$DRY_RUN" -eq 0 ]; then
+  if [ -d "$APEX/lindroid" ]; then
+    mkdir -p "$LOS_SOURCE/vendor/apex/lindroid"
+    cp -r "$APEX/lindroid/aidl" "$LOS_SOURCE/vendor/apex/lindroid/"
+    cp -r "$APEX/lindroid/java" "$LOS_SOURCE/vendor/apex/lindroid/"
+    # Lindroid scripts → prebuilt bin
+    for script in "$APEX"/lindroid/scripts/*.sh; do
+      [ -f "$script" ] || continue
+      cp "$script" "$LOS_SOURCE/device/xiaomi/topaz/prebuilt/bin/" 2>/dev/null || true
+    done
+    # SELinux
+    for te_file in "$APEX"/lindroid/sepolicy/*.te; do
+      [ -f "$te_file" ] || continue
+      cp "$te_file" "$LOS_SOURCE/system/sepolicy/vendor/" 2>/dev/null || true
+    done
+    echo "  Lindroid installed"
+  fi
+fi
+end_phase
+
+# Phase 9: Install NFCForge + PTK TUI apps
+start_phase "Installing NFCForge and PTK TUI apps"
+if [ "$DRY_RUN" -eq 0 ]; then
+  for app in nfcforge ptk-tui; do
+    if [ -d "$APEX/apps/$app" ]; then
+      mkdir -p "$LOS_SOURCE/vendor/apex/apps/$app"
+      cp -r "$APEX/apps/$app/"* "$LOS_SOURCE/vendor/apex/apps/$app/"
+      echo "  $app installed"
+    fi
+  done
+fi
+end_phase
+
+# Phase 10: Install hiding stack modules
+start_phase "Installing hiding stack modules"
+if [ "$DRY_RUN" -eq 0 ]; then
+  if [ -d "$APEX/hiding" ]; then
+    mkdir -p "$LOS_SOURCE/vendor/apex/hiding"
+    cp -r "$APEX/hiding/"* "$LOS_SOURCE/vendor/apex/hiding/"
+    echo "  hiding stack scripts installed"
+  fi
+fi
+end_phase
+
+# Phase 11: Build ROM
 start_phase "Building ROM (lunch + m)"
 if [ "$DRY_RUN" -eq 0 ]; then
   cd "$LOS_SOURCE"
@@ -246,7 +340,7 @@ if [ "$DRY_RUN" -eq 0 ]; then
 fi
 end_phase
 
-# Phase 7: Verify output
+# Phase 12: Verify output
 start_phase "Verifying ROM output"
 if [ "$DRY_RUN" -eq 0 ]; then
   ROM_ZIP=$(find "$LOS_SOURCE/out" -name "lineage-*.zip" -path "*target*" 2>/dev/null | head -1)

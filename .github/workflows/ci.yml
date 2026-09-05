@@ -188,3 +188,155 @@ jobs:
             apex-kernel-*.zip
             apex-kernel-*.zip.sha256
           retention-days: 14
+
+  rom-verification:
+    name: ROM Structure Verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run verify.sh
+        run: |
+          bash tools/verify.sh
+
+      - name: Run verify-stealth.sh
+        run: |
+          bash tools/verify-stealth.sh
+
+      - name: Run brick-safety verification
+        run: |
+          bash tools/verify-brick-safety.sh
+
+      - name: Verify build-rom.sh syntax
+        run: |
+          bash -n tools/build-rom.sh
+          bash -n tools/package-rom.sh
+          bash -n tools/build-scrcpy-server.sh
+          bash -n tools/build-lindroid.sh
+          bash -n tools/build-pentest-drivers.sh
+          bash -n tools/package-hiding-stack.sh
+
+      - name: Verify all shell scripts have shebangs
+        run: |
+          fail=0
+          for f in hiding/install_modules.sh hiding/configure_hiding.sh \
+                   lindroid/scripts/lindroid-*.sh \
+                   rom-overlays/update/*.sh; do
+            [ -f "$f" ] || continue
+            if ! head -1 "$f" | grep -q '^#!'; then
+              echo "ERROR: $f missing shebang"
+              fail=1
+            fi
+          done
+          exit $fail
+
+      - name: Verify AIDL files are well-formed
+        run: |
+          for aidl in wm/aidl/com/apex/wm/*.aidl \
+                      desktop/aidl/com/apex/desktop/*.aidl \
+                      lindroid/aidl/com/apex/lindroid/*.aidl; do
+            [ -f "$aidl" ] || continue
+            if ! grep -q '^package ' "$aidl"; then
+              echo "ERROR: $aidl missing package declaration"
+              exit 1
+            fi
+            if ! grep -q 'interface ' "$aidl"; then
+              echo "ERROR: $aidl missing interface declaration"
+              exit 1
+            fi
+            echo "  OK: $aidl"
+          done
+
+      - name: Verify SELinux policies have type declarations
+        run: |
+          for te in agent/sepolicy/*.te wm/sepolicy/*.te \
+                   desktop/sepolicy/*.te lindroid/sepolicy/*.te; do
+            [ -f "$te" ] || continue
+            if ! grep -qE '^(type |# )' "$te"; then
+              echo "ERROR: $te has no type declaration or comment"
+              exit 1
+            fi
+            echo "  OK: $te"
+          done
+
+      - name: Verify init.d RC files
+        run: |
+          for rc in rom-overlays/init.d/*.rc; do
+            [ -f "$rc" ] || continue
+            if ! grep -qE '^(on |service )' "$rc"; then
+              echo "ERROR: $rc has no triggers (on/service)"
+              exit 1
+            fi
+            echo "  OK: $rc"
+          done
+
+      - name: Verify device.mk wiring
+        run: |
+          DMK="rom-overlays/device/apex_device.mk"
+          for entry in apex_game_space apex_gestures apex_pocket apex_smart_charging \
+                       apex_notifications apex_reboot apex_power_user apex_tuning \
+                       apex_power apex_profiles hidden_packages thermald \
+                       apex-alarmkeeper apex_alarm PRODUCT_SEPOLICY; do
+            if ! grep -q "$entry" "$DMK"; then
+              echo "ERROR: $entry not wired in device.mk"
+              exit 1
+            fi
+            echo "  OK: $entry in device.mk"
+          done
+
+      - name: Verify LOS integration makefile
+        run: |
+          LOS_MK="rom-overlays/device/apex_lineage_topaz.mk"
+          if [ ! -f "$LOS_MK" ]; then
+            echo "ERROR: $LOS_MK not found"
+            exit 1
+          fi
+          for entry in apex_device.mk ApexWmOverlay scrcpy apex_remote_proxy hiding; do
+            if ! grep -q "$entry" "$LOS_MK"; then
+              echo "ERROR: $entry not in $LOS_MK"
+              exit 1
+            fi
+            echo "  OK: $entry in apex_lineage_topaz.mk"
+          done
+
+      - name: Verify Kotlin screens have Compose annotations
+        run: |
+          for kt in apps/apex-control/app/src/main/java/com/apex/control/poweruser/*.kt; do
+            [ -f "$kt" ] || continue
+            # Screen files should have @Composable
+            if echo "$kt" | grep -q 'Screen'; then
+              if ! grep -q '@Composable' "$kt"; then
+                echo "ERROR: $kt is a Screen but has no @Composable"
+                exit 1
+              fi
+            fi
+            echo "  OK: $kt"
+          done
+
+      - name: Verify NFCForge app structure
+        run: |
+          for f in apps/nfcforge/app/src/main/AndroidManifest.xml \
+                   apps/nfcforge/app/build.gradle.kts \
+                   apps/nfcforge/app/src/main/java/com/apex/nfcforge/data/BridgeClient.kt \
+                   apps/nfcforge/app/src/main/java/com/apex/nfcforge/ui/MainScreen.kt \
+                   apps/nfcforge/app/src/main/java/com/apex/nfcforge/ui/MainActivity.kt; do
+            if [ ! -f "$f" ]; then
+              echo "ERROR: $f not found"
+              exit 1
+            fi
+            echo "  OK: $f"
+          done
+
+      - name: Verify PTK TUI app structure
+        run: |
+          for f in apps/ptk-tui/app/src/main/AndroidManifest.xml \
+                   apps/ptk-tui/app/build.gradle.kts \
+                   apps/ptk-tui/app/src/main/java/com/apex/ptk/data/TerminalSession.kt \
+                   apps/ptk-tui/app/src/main/java/com/apex/ptk/ui/TerminalScreen.kt \
+                   apps/ptk-tui/app/src/main/java/com/apex/ptk/ui/MainActivity.kt; do
+            if [ ! -f "$f" ]; then
+              echo "ERROR: $f not found"
+              exit 1
+            fi
+            echo "  OK: $f"
+          done

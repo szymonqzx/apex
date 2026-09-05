@@ -175,10 +175,13 @@ PRODUCT_COPY_FILES += \
 PRODUCT_COPY_FILES += \
     vendor/apex/rom-overlays/thermald/thermald.conf:$(TARGET_COPY_OUT_VENDOR)/etc/thermald.conf
 
-# ── AlarmKeeper binary ────────────────────────────────────────────
+# ── AlarmKeeper binary + init ─────────────────────────────────────
 
 PRODUCT_PACKAGES += \
     apex-alarmkeeper
+
+PRODUCT_COPY_FILES += \
+    vendor/apex/rom-overlays/init.d/apex_alarm.rc:$(TARGET_COPY_OUT_SYSTEM)/etc/init/apex_alarm.rc
 
 # ── Brick-safety: explicitly NOT included ─────────────────────────
 # The following are NEVER touched by APEX ROM:
