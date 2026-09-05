@@ -1,0 +1,15 @@
+# ApexWmOverlay Android.bp — build definition for the framework overlay.
+# This produces ApexWmOverlay.apk (no code, just resources).
+
+android_app {
+    name: "ApexWmOverlay",
+    sdk_version: "system_current",
+    resource_dirs: ["res"],
+    manifest: "AndroidManifest.xml",
+    aaptflags: ["--no-resource-removal"],
+    certificate: "platform",
+    privileged: true,
+    optimize: {
+        enabled: false,
+    },
+}

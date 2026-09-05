@@ -1,0 +1,13 @@
+# apex_wm.rc — init script for APEX Window Manager.
+#
+# WM runs inside system_server, so there's no separate service to start.
+# This RC file sets the freeform window management property at boot
+# and applies the framework overlay.
+
+on property:sys.boot_completed=1
+    # Enable freeform window management if APEX WM is enabled
+    setprop persist.sys.freeform_window_management ${ro.apex.wm_enabled:-0}
+
+    # If WM is enabled, set the framework overlay flag
+    on property:persist.sys.freeform_window_management=1
+        setprop debug.freeform_window_management 1

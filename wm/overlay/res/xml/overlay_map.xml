@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <overlayable name="config_freeformWindowManagement">
+        <policy type="system|signature">
+            <item name="config_freeformWindowManagement" />
+            <item name="config_freeformWindowShownByDefault" />
+            <item name="config_supportsFreeformWindowMode" />
+            <item name="config_taskOrganizerWindowingModeSupported" />
+            <item name="config_supportsMultiWindow" />
+            <item name="config_allowMultiWindowInFreeform" />
+        </policy>
+    </overlayable>
+</resources>

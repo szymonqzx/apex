@@ -1,0 +1,15 @@
+# apex_modules.rc — installed at /system/etc/init/apex_modules.rc
+# One-time KSU module installer for the hiding stack.
+# Runs after boot_completed + KSU initialization.
+
+on property:sys.boot_completed=1
+    # Wait 10 seconds for KSU to initialize
+    exec - root root -- /system/bin/sh -c "sleep 10 && /system/bin/apex_install_modules.sh"
+
+# Service definition (for re-trigger if needed)
+service apex_install_modules /system/bin/apex_install_modules.sh
+    class main
+    user root
+    group root
+    disabled
+    oneshot

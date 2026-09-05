@@ -1,0 +1,19 @@
+# apex_wm.te — SELinux policy for APEX Window Manager.
+#
+# ApexWindowManager runs inside system_server (no separate domain).
+# It uses TaskOrganizer and ActivityTaskManager APIs which are
+# already available to system_server.
+#
+# This policy file is minimal — system_server already has the
+# permissions needed. We only add the service name registration.
+
+# No separate domain — WM runs in system_server context.
+# This file exists to document the security model and add any
+# future policy if WM gets its own domain.
+
+# If we later split WM into a separate process:
+# type apex_wm, domain;
+# type apex_wm_exec, file_type, exec_type;
+# init_daemon_domain(apex_wm)
+# allow apex_wm activity_task_service:service_manager { add find };
+# allow apex_wm surfaceflinger_service:service_manager find;

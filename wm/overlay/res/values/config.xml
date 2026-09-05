@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ApexWmOverlay — framework resource overlay for freeform window management.
+
+  This overlay enables config_freeformWindowManagement in the Android
+  framework, allowing freeform (floating) windows on phone form factor.
+  Without this overlay, freeform windows are only available on tablets
+  and large-screen devices.
+
+  Install as a product overlay:
+    /product/overlay/ApexWmOverlay.apk
+-->
+<resources>
+    <!-- Enable freeform window management -->
+    <bool name="config_freeformWindowManagement">true</bool>
+
+    <!-- Enable freeform windows in window manager -->
+    <bool name="config_freeformWindowShownByDefault">false</bool>
+
+    <!-- Allow tasks to be moved to freeform mode -->
+    <bool name="config_supportsFreeformWindowMode">true</bool>
+
+    <!-- Task organizer support -->
+    <bool name="config_taskOrganizerWindowingModeSupported">true</bool>
+
+    <!-- Multi-window support (already true on most devices, but enforce) -->
+    <bool name="config_supportsMultiWindow">true</bool>
+
+    <!-- Allow multi-window in freeform mode -->
+    <bool name="config_allowMultiWindowInFreeform">true</bool>
+</resources>

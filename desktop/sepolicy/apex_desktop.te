@@ -1,0 +1,22 @@
+# apex_desktop.te — SELinux policy for APEX Desktop Mode service.
+#
+# DesktopModeService runs inside system_server (like WM).
+# It launches scrcpy-server via app_process.
+#
+# scrcpy-server needs:
+#   - Network socket (TCP for tunnel forwarding)
+#   - Access to /system/bin/scrcpy-server.jar
+#   - app_process execution
+#   - SurfaceFlinger access (screen capture)
+#   - AudioFlinger access (audio capture)
+
+# DesktopModeService runs in system_server — no separate domain needed.
+# system_server already has surfaceflinger and audio access.
+
+# If we split into a separate process for scrcpy:
+# type apex_scrcpy, domain;
+# type apex_scrcpy_exec, file_type, exec_type;
+# init_daemon_domain(apex_scrcpy)
+# net_domain(apex_scrcpy)
+# allow apex_scrcpy surfaceflinger_service:service_manager find;
+# allow apex_scrcpy audio_flinger:service_manager find;

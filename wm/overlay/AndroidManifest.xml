@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ApexWmOverlay manifest — declares this as a runtime resource overlay.
+  Target package: android (framework)
+  Target overlayable: config_freeformWindowManagement
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.apex.wm.overlay"
+    android:versionCode="1"
+    android:versionName="1.0">
+
+    <application
+        android:hasCode="false"
+        android:label="APEX WM Overlay" />
+
+    <overlay
+        android:targetPackage="android"
+        android:targetName="config_freeformWindowManagement"
+        android:resourcesMap="@xml/overlay_map"
+        android:priority="100"
+        android:isStatic="true" />
+</manifest>

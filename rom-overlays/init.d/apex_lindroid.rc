@@ -1,0 +1,15 @@
+# apex_lindroid.rc — init script for Lindroid container manager.
+# LindroidManager runs inside system_server, no separate service.
+# This RC sets properties and provides a property-based trigger.
+
+on property:sys.boot_completed=1
+    # Lindroid is disabled by default — user enables via Apex Control
+    setprop persist.sys.apex.lindroid_enabled 0
+
+# Property-based container start (alternative to binder call)
+on property:apex.lindroid.start=1
+    exec - root root -- /system/bin/lindroid-start.sh
+    setprop apex.lindroid.start 0
+
+on property:apex.lindroid.start=0
+    # No-op (trigger cleared)

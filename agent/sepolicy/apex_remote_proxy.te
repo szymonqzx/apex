@@ -1,0 +1,38 @@
+# apex_remote_proxy.te — SELinux policy for the remote model proxy.
+#
+# This is a SEPARATE domain from apex_agent. The proxy has network
+# access; apexagentd does NOT. Communication is via local TCP socket
+# on port 9879.
+#
+# Security model:
+#   apexagentd (no network) → TCP localhost:9879 → apex_remote_proxy (network)
+#
+# The proxy only forwards chat completion requests. It does NOT have
+# access to sysfs, procfs, binder, or any hardware.
+
+type apex_remote_proxy, domain;
+type apex_remote_proxy_exec, file_type, exec_type;
+
+# Domain transition from init
+init_daemon_domain(apex_remote_proxy)
+
+# Network access (the whole point of this separate domain)
+net_domain(apex_remote_proxy)
+allow apex_remote_proxy port_type:tcp_socket name_connect;
+
+# Local TCP socket on port 9879
+allow apex_remote_proxy apex_remote_proxy:tcp_socket { create listen accept read write bind };
+allow apex_remote_proxy node_type:tcp_socket node_bind;
+
+# Read system properties for endpoint configuration
+get_prop(apex_remote_proxy, system_prop)
+
+# Logging
+allow apex_remote_proxy apex_remote_proxy:socket { read write };
+
+# NEVERALLOW: no binder, no sysfs, no procfs, no hardware access
+neverallow apex_remote_proxy binder_device:chr_file { read write };
+neverallow apex_remote_proxy sysfs_type:file { read write };
+neverallow apex_remote_proxy proc_type:file { read write };
+neverallow apex_remote_proxy block_device:blk_file { read write };
+neverallow apex_remote_proxy self:capability { sys_admin sys_module sys_ptrace };

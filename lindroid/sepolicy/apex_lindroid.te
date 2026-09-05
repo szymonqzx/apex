@@ -1,0 +1,21 @@
+# apex_lindroid.te — SELinux policy for Lindroid container manager.
+#
+# LindroidManager runs in system_server. It launches shell scripts
+# that use unshare/nsenter for container isolation.
+#
+# The container process needs:
+#   - CAP_SYS_ADMIN (for unshare/mount)
+#   - CAP_NET_ADMIN (for veth setup)
+#   - Network access (container has its own net namespace)
+#   - Access to /data/adb/apex/arch (container rootfs)
+
+# LindroidManager runs in system_server — no separate domain.
+# system_server can exec shell scripts and has the needed capabilities.
+
+# If we split into a separate process:
+# type apex_lindroid, domain;
+# type apex_lindroid_exec, file_type, exec_type;
+# init_daemon_domain(apex_lindroid)
+# allow apex_lindroid self:capability { sys_admin net_admin };
+# allow apex_lindroid apex_data_file:dir { read write create };
+# allow apex_lindroid apex_data_file:file { read write create unlink };

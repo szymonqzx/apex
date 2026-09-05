@@ -104,6 +104,82 @@ PRODUCT_COPY_FILES += \
     vendor/apex/rom-overlays/init.d/apex_kernel_detect.rc:$(TARGET_COPY_OUT_SYSTEM)/etc/init/apex_kernel_detect.rc \
     vendor/apex/rom-overlays/init.d/apex_kernel_detect.sh:$(TARGET_COPY_OUT_SYSTEM)/bin/apex_kernel_detect.sh
 
+# ── Power-user feature init scripts ───────────────────────────────
+# Game Space, gestures, pocket detect, smart charging, notifications,
+# advanced reboot, power-user toggles, tuning, power profiles.
+
+PRODUCT_COPY_FILES += \
+    vendor/apex/rom-overlays/init.d/apex_game_space.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/apex_game_space.rc \
+    vendor/apex/rom-overlays/init.d/apex_gestures.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/apex_gestures.rc \
+    vendor/apex/rom-overlays/init.d/apex_pocket.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/apex_pocket.rc \
+    vendor/apex/rom-overlays/init.d/apex_pocket_detect.sh:$(TARGET_COPY_OUT_VENDOR)/bin/apex_pocket_detect.sh \
+    vendor/apex/rom-overlays/init.d/apex_smart_charging.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/apex_smart_charging.rc \
+    vendor/apex/rom-overlays/init.d/apex_smart_charge.sh:$(TARGET_COPY_OUT_VENDOR)/bin/apex_smart_charge.sh \
+    vendor/apex/rom-overlays/init.d/apex_notifications.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/apex_notifications.rc \
+    vendor/apex/rom-overlays/init.d/apex_reboot.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/apex_reboot.rc \
+    vendor/apex/rom-overlays/init.d/apex_power_user.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/apex_power_user.rc \
+    vendor/apex/rom-overlays/init.d/apex_screenshot_gesture.sh:$(TARGET_COPY_OUT_VENDOR)/bin/apex_screenshot_gesture.sh
+
+# ── Boot-time tuning and power profiles ───────────────────────────
+
+PRODUCT_COPY_FILES += \
+    vendor/apex/rom-overlays/init.d/apex_tuning.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/apex_tuning.rc \
+    vendor/apex/rom-overlays/init.d/apex_power.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/apex_power.rc \
+    vendor/apex/rom-overlays/init.d/apex_profiles.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/apex_profiles.rc
+
+# ── SELinux policies ──────────────────────────────────────────────
+
+PRODUCT_SEPOLICY += \
+    vendor/apex/agent/sepolicy/apex_agent.te \
+    vendor/apex/rom-overlays/selinux/apex_charge.te \
+    vendor/apex/rom-overlays/selinux/apex_chown.te
+
+# ── Build properties (PIF + APEX identity) ────────────────────────
+# build.prop appends are merged via PRODUCT_*_PROPERTIES directives.
+
+PRODUCT_SYSTEM_PROPERTIES += \
+    ro.build.fingerprint=Xiaomi/topaz_global/topaz:13/TKQ1.221114.001/V816.0.7.0.UMGMIXM:user/release-keys \
+    ro.product.build.fingerprint=Xiaomi/topaz_global/topaz:13/TKQ1.221114.001/V816.0.7.0.UMGMIXM:user/release-keys \
+    ro.build.type=user \
+    ro.build.keys=release-keys \
+    ro.debuggable=0 \
+    ro.secure=1 \
+    ro.build.version.security_patch=2024-12-01 \
+    ro.system.build.id=TKQ1.221114.001 \
+    ro.system.build.tags=release-keys \
+    ro.product.build.id=TKQ1.221114.001 \
+    ro.product.build.tags=release-keys \
+    ro.boot.veritymode=enforcing \
+    ro.boot.verifiedbootstate=yellow \
+    ro.apex.hide=1 \
+    ro.apex.game_space=0 \
+    ro.apex.pocket_detect=0 \
+    ro.apex.smart_charge=0 \
+    ro.apex.screenshot_gesture=0 \
+    ro.apex.dt2w=0 \
+    ro.apex.tts=0
+
+PRODUCT_VENDOR_PROPERTIES += \
+    ro.vendor.build.security_patch=2024-12-01 \
+    ro.vendor.build.tags=release-keys \
+    ro.vendor.build.fingerprint=Xiaomi/topaz_global/topaz:13/TKQ1.221114.001/V816.0.7.0.UMGMIXM:user/release-keys \
+    ro.vendor.apex.version=1.3.0
+
+# ── Hidden packages list (root hiding) ────────────────────────────
+
+PRODUCT_COPY_FILES += \
+    vendor/apex/rom-overlays/hidden_packages.list:$(TARGET_COPY_OUT_SYSTEM)/etc/apex_hidden_packages.list
+
+# ── Thermald configuration ────────────────────────────────────────
+
+PRODUCT_COPY_FILES += \
+    vendor/apex/rom-overlays/thermald/thermald.conf:$(TARGET_COPY_OUT_VENDOR)/etc/thermald.conf
+
+# ── AlarmKeeper binary ────────────────────────────────────────────
+
+PRODUCT_PACKAGES += \
+    apex-alarmkeeper
+
 # ── Brick-safety: explicitly NOT included ─────────────────────────
 # The following are NEVER touched by APEX ROM:
 # - bootloader (aboot)

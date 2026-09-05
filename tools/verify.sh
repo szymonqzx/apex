@@ -242,6 +242,132 @@ else
   warn "No flashable zip found (run tools/package-anykernel3.sh)"
 fi
 
+# --- 10. ROM overlays (new) ------------------------------------------------
+echo ""
+echo "  --- ROM overlays ---"
+
+# Check all init.d scripts exist
+for script in apex_agent.rc apex_kernel_detect.rc apex_game_space.rc \
+              apex_gestures.rc apex_pocket.rc apex_smart_charging.rc \
+              apex_notifications.rc apex_reboot.rc apex_power_user.rc \
+              apex_tuning.rc apex_power.rc apex_profiles.rc \
+              apex_wm.rc apex_desktop.rc apex_remote_proxy.rc \
+              apex_modules.rc apex_lindroid.rc; do
+  if [ -f "$APEX/rom-overlays/init.d/$script" ]; then
+    ok "  init.d/$script"
+  else
+    fail "  init.d/$script missing"
+  fi
+done
+
+# Check device.mk includes all overlays
+DEVICE_MK="$APEX/rom-overlays/device/apex_device.mk"
+if [ -f "$DEVICE_MK" ]; then
+  ok "  device/apex_device.mk present"
+  # Check for key inclusions
+  for pattern in "apex_game_space" "apex_tuning" "apex_power" "apex_profiles" \
+                 "hidden_packages" "thermald" "apex-alarmkeeper" "PRODUCT_SEPOLICY"; do
+    if grep -q "$pattern" "$DEVICE_MK" 2>/dev/null; then
+      ok "    device.mk includes $pattern"
+    else
+      warn "    device.mk missing $pattern"
+    fi
+  done
+else
+  fail "  device/apex_device.mk missing"
+fi
+
+# Check LOS integration makefile
+LOS_MK="$APEX/rom-overlays/device/apex_lineage_topaz.mk"
+if [ -f "$LOS_MK" ]; then
+  ok "  device/apex_lineage_topaz.mk present"
+else
+  fail "  device/apex_lineage_topaz.mk missing"
+fi
+
+# Check hiding stack
+for file in install_modules.sh configure_hiding.sh denylist.conf; do
+  if [ -f "$APEX/hiding/$file" ]; then
+    ok "  hiding/$file"
+  else
+    fail "  hiding/$file missing"
+  fi
+done
+
+# Check agent enhancements
+for file in RemoteModelClient.java RemoteProxyDaemon.java ChargeControlTool.java \
+            AgentVectorStore.java MemoryManager.java; do
+  if [ -f "$APEX/agent/java/com/apex/agent/$file" ]; then
+    ok "  agent/$file"
+  else
+    fail "  agent/$file missing"
+  fi
+done
+
+# Check remote proxy SELinux + init
+if [ -f "$APEX/agent/sepolicy/apex_remote_proxy.te" ]; then
+  ok "  sepolicy/apex_remote_proxy.te"
+else
+  fail "  sepolicy/apex_remote_proxy.te missing"
+fi
+
+# Check WM
+for file in "aidl/com/apex/wm/IApexWindowManager.aidl" \
+            "java/com/apex/wm/ApexWindowManager.java" \
+            "overlay/res/values/config.xml" \
+            "overlay/AndroidManifest.xml"; do
+  if [ -f "$APEX/wm/$file" ]; then
+    ok "  wm/$file"
+  else
+    fail "  wm/$file missing"
+  fi
+done
+
+# Check Desktop
+for file in "aidl/com/apex/desktop/IDesktopMode.aidl" \
+            "java/com/apex/desktop/DesktopModeService.java"; do
+  if [ -f "$APEX/desktop/$file" ]; then
+    ok "  desktop/$file"
+  else
+    fail "  desktop/$file missing"
+  fi
+done
+
+# Check Lindroid
+for file in "aidl/com/apex/lindroid/ILindroid.aidl" \
+            "java/com/apex/lindroid/LindroidManager.java" \
+            "scripts/lindroid-start.sh" \
+            "scripts/lindroid-stop.sh" \
+            "scripts/lindroid-exec.sh" \
+            "scripts/lindroid-migrate.sh" \
+            "scripts/lindroid-init.sh"; do
+  if [ -f "$APEX/lindroid/$file" ]; then
+    ok "  lindroid/$file"
+  else
+    fail "  lindroid/$file missing"
+  fi
+done
+
+# Check Apex Control app new screens
+for file in "poweruser/GovernorTuningScreen.kt" \
+            "poweruser/ThermalProfileScreen.kt" \
+            "poweruser/IncidentLogViewer.kt"; do
+  if [ -f "$APEX/apps/apex-control/app/src/main/java/com/apex/control/$file" ]; then
+    ok "  apex-control/$file"
+  else
+    fail "  apex-control/$file missing"
+  fi
+done
+
+# Check build tools
+for tool in package-rom.sh build-scrcpy-server.sh build-lindroid.sh package-hiding-stack.sh; do
+  if [ -f "$APEX/tools/$tool" ]; then
+    ok "  tools/$tool"
+  else
+    fail "  tools/$tool missing"
+  fi
+done
+
 # --- Summary ---------------------------------------------------------------
 echo ""
 echo "=== Verification complete ==="
