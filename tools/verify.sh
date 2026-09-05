@@ -90,12 +90,13 @@ else
   warn "APEX sysfs not detected in Image (check CONFIG_APEX_SYSFS)"
 fi
 
-# charge is a module (CONFIG_APEX_CHARGE=m) — search modules too
-CHARGE_KO=$(find "$OUT" -name "apex_charge.ko" 2>/dev/null | head -1)
-if in_image "APEX: charge control initialized" || [ -n "$CHARGE_KO" ]; then
-  ok "APEX charge control available${CHARGE_KO:+ (module)}"
+# charge limiting is now a standard power_supply property on the bq2589x
+# "bbc" supply (CHARGE_CONTROL_END_THRESHOLD), built into the bq2589x module
+CHARGE_KO=$(find "$OUT" -name "bq2589x_charger.ko" 2>/dev/null | head -1)
+if in_image "END_THRESHOLD_VOTER" || { [ -n "$CHARGE_KO" ] && strings "$CHARGE_KO" | grep "END_THRESHOLD_VOTER" >/dev/null; }; then
+  ok "Charge end threshold in bq2589x driver${CHARGE_KO:+ (module)}"
 else
-  warn "APEX charge control not found (CONFIG_APEX_CHARGE)"
+  warn "Charge end threshold not detected (check bq2589x patch)"
 fi
 
 # --- 5. Scheduler ----------------------------------------------------------

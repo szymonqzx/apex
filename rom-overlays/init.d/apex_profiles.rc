@@ -7,7 +7,8 @@
 #   - default governor: schedhorizon (EAS-compatible schedutil fork)
 #   - WALT load tracking (sysctls under /proc/sys/kernel/sched_*)
 #   - Adreno 610 GPU (stock ceiling 1260 MHz)
-#   - APEX charge limiting via /sys/class/apex/charge/
+#   - Charge limiting via standard power_supply property on the bq2589x
+#     "bbc" supply: /sys/class/power_supply/bbc/charge_control_end_threshold
 #
 # The dead /proc/apex/* and /proc/apex_charge/* surfaces from older plans
 # are GONE — do not write them.
@@ -28,7 +29,7 @@ on property:apex.profile=battery
     write /sys/class/kgsl/kgsl-3d0/max_gpuclk 1071000000
     write /sys/class/kgsl/kgsl-3d0/devfreq/max_freq 1071000000
     # Charge limit: 80% for battery health
-    write /sys/class/apex/charge/charge_limit_percent 80
+    write /sys/class/power_supply/bbc/charge_control_end_threshold 80
     setprop sys.apex.profile.active battery
 
 # === Balanced profile (default) ===
@@ -46,7 +47,7 @@ on property:apex.profile=balanced
     write /sys/class/kgsl/kgsl-3d0/max_gpuclk 1260000000
     write /sys/class/kgsl/kgsl-3d0/devfreq/max_freq 1260000000
     # Charge limit: 90%
-    write /sys/class/apex/charge/charge_limit_percent 90
+    write /sys/class/power_supply/bbc/charge_control_end_threshold 90
     setprop sys.apex.profile.active balanced
 
 # === Performance profile ===
@@ -64,5 +65,5 @@ on property:apex.profile=performance
     write /sys/class/kgsl/kgsl-3d0/max_gpuclk 1260000000
     write /sys/class/kgsl/kgsl-3d0/devfreq/max_freq 1260000000
     # Charge limit: disabled
-    write /sys/class/apex/charge/charge_limit_percent 0
+    write /sys/class/power_supply/bbc/charge_control_end_threshold 0
     setprop sys.apex.profile.active performance

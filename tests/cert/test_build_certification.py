@@ -4,7 +4,7 @@
 Verifies that:
   1. The built kernel Image exists and is a valid ARM64 Image.
   2. The apex_sysfs module is present in the build output.
-  3. The apex_charge module is present in the build output.
+  3. The bq2589x charger module has charge end threshold support.
   4. Critical device drivers (fingerprint, charger, thermal) are present.
   5. Security configs (CFI, BPF unpriv off) are enabled in the final .config.
   6. A flashable AnyKernel3 zip exists.
@@ -52,11 +52,19 @@ class TestBuildCertification(unittest.TestCase):
             self.assertIn("apex_sysfs_init", sysmap.read_text(),
                           "apex_sysfs_init not in System.map")
 
-    def test_apex_charge_module_exists(self):
-        mod = OUT / "drivers" / "apex" / "apex_charge.ko"
+    def test_bq2589x_charge_threshold_compiled(self):
+        """The bq2589x charger module must contain the charge end threshold
+        voter (CHARGE_CONTROL_END_THRESHOLD support)."""
+        mod = OUT / "drivers" / "power" / "supply" / "nopmi" / "bq2589x_charger.ko"
         if not mod.exists():
-            self.skipTest("apex_charge.ko not built (may need modules build)")
-        self.assertTrue(mod.stat().st_size > 0, "apex_charge.ko is empty")
+            self.skipTest("bq2589x_charger.ko not built (may need modules build)")
+        self.assertTrue(mod.stat().st_size > 0, "bq2589x_charger.ko is empty")
+        # Verify the END_THRESHOLD_VOTER string is in the module
+        import subprocess
+        result = subprocess.run(["strings", str(mod)], capture_output=True, text=True)
+        self.assertIn("END_THRESHOLD_VOTER", result.stdout,
+                      "END_THRESHOLD_VOTER not in bq2589x_charger.ko — "
+                      "charge threshold patch not applied")
 
     def test_device_drivers_present(self):
         """Critical device driver modules must be present."""

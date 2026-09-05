@@ -1,0 +1,79 @@
+# apex_tuning.rc — installed at /vendor/etc/init/apex_tuning.rc
+# Boot-time tuning for proven kernel subsystems on SM6225-AD (topaz/tapas)
+#
+# This script sets baseline values for proven kernel components at boot.
+# Profile-specific overrides (CPU governor, GPU, charge threshold) are in
+# apex_profiles.rc. This script handles subsystems that don't change per
+# profile: I/O scheduler, memory reclaim, KSM, VM, MGLRU.
+#
+# All values are tuned for:
+#   - Snapdragon 685 (SM6225-AD / Khaje)
+#   - 4x Cortex-A53 @ ~1.9 GHz + 4x Cortex-A73 @ ~2.8 GHz
+#   - UFS 2.2, LPDDR4X, 4GB or 6GB RAM
+#   - 120 Hz AMOLED display
+#   - Linux 5.15.211 (Zepharo branch)
+#
+# Sources: kernel source tree defaults (block/ssg-iosched.c, mm/damon/reclaim.c,
+# mm/ksm.c, mm/vmscan.c, kernel/sched/cpufreq_schedhorizon.c,
+# kernel/sched/walt/sysctl.c) + Android phone tuning conventions.
+
+on boot
+    # === SSG I/O scheduler ===
+    # Defaults: read_expire=HZ/2 (150ms@300Hz), write_expire=5*HZ (1500ms)
+    # Tuned: faster read expiry for UI responsiveness, keep write default
+    write /sys/block/sda/queue/iosched/read_expire 100
+    write /sys/block/sda/queue/iosched/write_expire 1500
+    write /sys/block/sda/queue/iosched/front_merges 1
+
+    # === Block layer ===
+    # read_ahead_kb: 128KB is fine for UFS 2.2 (default)
+    # wbt_lat_usec: 2000us default writeback throttling target
+    write /sys/block/sda/queue/read_ahead_kb 128
+
+    # === MGLRU (Multi-Gen LRU) ===
+    # Default min_ttl_ms=0 (no minimum generation TTL)
+    # Set 1000ms to prevent thrashing on rapid generation churn
+    write /sys/kernel/mm/lru_gen/min_ttl_ms 1000
+
+    # === KSM (Kernel Samepage Merging) ===
+    # Default: run=0 (stopped), pages_to_scan=100, sleep=20ms
+    # Enable with conservative settings for memory savings on 4/6GB
+    write /sys/kernel/mm/ksm/pages_to_scan 100
+    write /sys/kernel/mm/ksm/sleep_millisecs 50
+    write /sys/kernel/mm/ksm/run 1
+
+    # === VM tuning ===
+    # swappiness=100 (default, good for ZRAM-backed swap)
+    # page_cluster=0 (disable swap readahead — ZRAM decompresses on demand)
+    # watermark_scale_factor=10 (default)
+    write /proc/sys/vm/swappiness 100
+    write /proc/sys/vm/page-cluster 0
+    write /proc/sys/vm/watermark_scale_factor 10
+    write /proc/sys/vm/vfs_cache_pressure 100
+
+    # === DAMON reclaim ===
+    # Defaults: min_age=120s, quota_ms=10, quota_sz=128MB, wmarks_high=500
+    # Tuned for phone: more conservative min_age (180s), smaller quota (64MB)
+    # to avoid reclaim overhead on 4GB variants
+    write /sys/module/damon_reclaim/parameters/min_age 180000000
+    write /sys/module/damon_reclaim/parameters/quota_sz 67108864
+    write /sys/module/damon_reclaim/parameters/wmarks_high 500
+    write /sys/module/damon_reclaim/parameters/wmarks_low 200
+
+    # === WALT scheduler baseline ===
+    # Default: upmigrate=95, downmigrate=85
+    # Set balanced baseline; profile script overrides per-profile
+    write /proc/sys/kernel/sched_upmigrate 90
+    write /proc/sys/kernel/sched_downmigrate 75
+
+    # === Schedhorizon governor baseline ===
+    # Default: up_rate_limit_us=500, down_rate_limit_us=1000
+    # Set balanced baseline; profile script overrides per-profile
+    write /sys/devices/system/cpu/cpufreq/policy0/schedhorizon/up_rate_limit_us 10000
+    write /sys/devices/system/cpu/cpufreq/policy0/schedhorizon/down_rate_limit_us 8000
+    write /sys/devices/system/cpu/cpufreq/policy4/schedhorizon/up_rate_limit_us 10000
+    write /sys/devices/system/cpu/cpufreq/policy4/schedhorizon/down_rate_limit_us 8000
+
+    # Set default profile to balanced
+    setprop apex.profile balanced
+    setprop sys.apex.profile.active balanced
