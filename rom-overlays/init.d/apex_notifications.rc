@@ -1,0 +1,44 @@
+# apex_notifications.rc — installed at /vendor/etc/init/apex_notifications.rc
+# Notification customization: heads-up timeout, notification priority,
+# and DND auto-toggle for gaming/media.
+#
+# Inspired by crDroid notification settings. Uses system properties
+# to control notification behavior at the framework level.
+#
+# Properties (set by Apex Control):
+#   persist.apex.heads_up_timeout=3000  — heads-up display duration (ms)
+#   persist.apex.heads_up=1             — enable heads-up notifications
+#   persist.apex.notif_light=1          — notification LED (if supported)
+#   persist.apex.blink_notif=0          — blink flashlight on incoming call
+
+# === Boot: apply persisted notification settings ===
+on property:sys.boot_completed=1
+    # Heads-up timeout (default 3000ms)
+    setprop persist.sys.heads_up_timeout ${persist.apex.heads_up_timeout:-3000}
+    # Heads-up enabled
+    setprop persist.sys.heads_up ${persist.apex.heads_up:-1}
+
+# === Heads-up timeout change ===
+on property:persist.apex.heads_up_timeout=*
+    setprop persist.sys.heads_up_timeout ${persist.apex.heads_up_timeout}
+
+# === Heads-up toggle ===
+on property:persist.apex.heads_up=1
+    setprop persist.sys.heads_up 1
+on property:persist.apex.heads_up=0
+    setprop persist.sys.heads_up 0
+
+# === Flashlight blink on incoming call ===
+on property:persist.apex.blink_notif=1
+    # Enable flashlight blink for incoming calls
+    # (handled by apex_flashlight_blink.sh companion script)
+    start apex_flashlight_blink
+on property:persist.apex.blink_notif=0
+    stop apex_flashlight_blink
+
+# Service definition for flashlight blink on incoming call
+service apex_flashlight_blink /vendor/bin/apex_flashlight_blink.sh
+    class main
+    user system
+    group system camera
+    disabled

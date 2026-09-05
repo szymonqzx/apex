@@ -1,0 +1,47 @@
+# apex_gestures.rc — installed at /vendor/etc/init/apex_gestures.rc
+# Gesture controls: tap-to-sleep, double-tap-to-wake, three-finger screenshot.
+#
+# Inspired by crDroid gesture features. Uses kernel gesture sysfs nodes
+# (apex_gestures class) and input event monitoring for screenshot gesture.
+#
+# Properties (set by Apex Control, persisted):
+#   persist.apex.dt2w=1           — double-tap-to-wake
+#   persist.apex.tts=1            — tap-to-sleep (status bar)
+#   persist.apex.screenshot_gesture=1 — three-finger screenshot
+#   persist.apex.gestures=1       — master gesture enable
+
+# === Boot: apply persisted gesture settings ===
+on property:sys.boot_completed=1
+    # Apply double-tap-to-wake setting
+    write /sys/class/apex_gestures/double_tap_wake ${persist.apex.dt2w:-0}
+    # Apply tap-to-sleep setting
+    write /sys/class/apex_gestures/tap_to_sleep ${persist.apex.tts:-0}
+    # Apply gesture wake setting
+    write /sys/class/apex_gestures/wake_gestures ${persist.apex.gestures:-0}
+    # Start three-finger screenshot monitor if enabled
+    exec - root root -- /vendor/bin/apex_screenshot_gesture.sh --init
+
+# === Double-tap-to-wake toggle ===
+on property:persist.apex.dt2w=1
+    write /sys/class/apex_gestures/double_tap_wake 1
+on property:persist.apex.dt2w=0
+    write /sys/class/apex_gestures/double_tap_wake 0
+
+# === Tap-to-sleep toggle ===
+on property:persist.apex.tts=1
+    write /sys/class/apex_gestures/tap_to_sleep 1
+on property:persist.apex.tts=0
+    write /sys/class/apex_gestures/tap_to_sleep 0
+
+# === Three-finger screenshot toggle ===
+on property:persist.apex.screenshot_gesture=1
+    start apex_screenshot_gesture
+on property:persist.apex.screenshot_gesture=0
+    stop apex_screenshot_gesture
+
+# Service definition for three-finger screenshot gesture monitor
+service apex_screenshot_gesture /vendor/bin/apex_screenshot_gesture.sh
+    class main
+    user system
+    group system
+    disabled

@@ -1,0 +1,41 @@
+# apex_pocket.rc — installed at /vendor/etc/init/apex_pocket.rc
+# Pocket detection: uses proximity sensor to detect when phone is in pocket,
+# suppresses accidental touches and prevents screen wake from notifications.
+#
+# Inspired by crDroid pocket detection. Implementation uses a simple
+# init.d script that polls the proximity sensor sysfs node and sets
+# apex.pocket property. The screen-off behavior is handled by the
+# kernel apex state machine (already wired in apex_power.rc).
+#
+# The actual polling is done by apex_pocket_detect.sh (companion script).
+# This RC file starts/stops the detection service.
+
+# Start pocket detection on boot
+on property:sys.boot_completed=1
+    # Start the pocket detection script as a background service
+    start apex_pocket_detect
+
+# Pocket detected → suppress wake events
+on property:apex.pocket=1
+    # Disable double-tap-to-wake while in pocket
+    write /sys/class/apex_gestures/double_tap_wake 0
+    # Disable gesture wake
+    write /sys/class/apex_gestures/wake_gestures 0
+    # Suppress notification wake
+    setprop apex.pocket.suppress_wake 1
+
+# Pocket cleared → restore gesture controls
+on property:apex.pocket=0
+    # Restore double-tap-to-wake (if user has it enabled)
+    write /sys/class/apex_gestures/double_tap_wake ${persist.apex.dt2w:-0}
+    # Restore gesture wake
+    write /sys/class/apex_gestures/wake_gestures ${persist.apex.gestures:-0}
+    setprop apex.pocket.suppress_wake 0
+
+# Service definition for the pocket detection script
+service apex_pocket_detect /vendor/bin/apex_pocket_detect.sh
+    class main
+    user system
+    group system
+    disabled
+    oneshot

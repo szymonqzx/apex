@@ -19,6 +19,10 @@ import com.apex.control.agent.ModelDownloadManager
 import com.apex.control.agent.ModelRouterScreen
 import com.apex.control.domain.ApexRepository
 import com.apex.control.domain.ApexState
+import com.apex.control.poweruser.PowerUserRepository
+import com.apex.control.poweruser.PowerUserScreen
+import com.apex.control.poweruser.PowerUserState
+import com.apex.control.poweruser.RebootAction
 import kotlinx.coroutines.launch
 
 /**
@@ -41,7 +45,16 @@ fun ApexControlScreen(
     val scope = rememberCoroutineScope()
     val incidentListState = rememberLazyListState()
     var selectedTab by rememberSaveable { mutableStateOf(0) }
-    val tabs = listOf("System", "Agent", "Model", "Audit", "Debug")
+    val tabs = listOf("System", "Agent", "Model", "Audit", "Debug", "Power")
+
+    // Power-user state
+    val powerUserRepo = remember { PowerUserRepository() }
+    var powerUserState by remember { mutableStateOf(PowerUserState()) }
+
+    // Fetch power-user state
+    LaunchedEffect(Unit) {
+        powerUserState = powerUserRepo.fetchState()
+    }
 
     // Fetch full state snapshot
     fun refreshAll() {
@@ -145,6 +158,77 @@ fun ApexControlScreen(
             2 -> ModelRouterScreen()
             3 -> AuditLogViewer()
             4 -> AgentDebugLogViewer()
+            5 -> PowerUserScreen(
+                state = powerUserState,
+                onGameSpaceChange = { enabled ->
+                    powerUserState = powerUserState.copy(gameSpaceEnabled = enabled)
+                    scope.launch { powerUserRepo.setGameSpace(enabled) }
+                },
+                onSensorBlockChange = { enabled ->
+                    powerUserState = powerUserState.copy(sensorBlockEnabled = enabled)
+                    scope.launch { powerUserRepo.setSensorBlock(enabled) }
+                },
+                onPocketDetectionChange = { enabled ->
+                    powerUserState = powerUserState.copy(pocketDetectionEnabled = enabled)
+                    scope.launch { powerUserRepo.setPocketDetection(enabled) }
+                },
+                onSmartChargingChange = { enabled ->
+                    powerUserState = powerUserState.copy(smartChargingEnabled = enabled)
+                    scope.launch { powerUserRepo.setSmartCharging(enabled) }
+                },
+                onChargeLimitChange = { percent ->
+                    powerUserState = powerUserState.copy(chargeLimitPercent = percent)
+                    scope.launch { powerUserRepo.setChargeLimit(percent) }
+                },
+                onTopUpTimeChange = { time ->
+                    powerUserState = powerUserState.copy(topUpTime = time)
+                    scope.launch { powerUserRepo.setTopUpTime(time) }
+                },
+                onWakeTimeChange = { time ->
+                    powerUserState = powerUserState.copy(wakeTime = time)
+                    scope.launch { powerUserRepo.setWakeTime(time) }
+                },
+                onDoubleTapToWakeChange = { enabled ->
+                    powerUserState = powerUserState.copy(doubleTapToWake = enabled)
+                    scope.launch { powerUserRepo.setDoubleTapToWake(enabled) }
+                },
+                onTapToSleepChange = { enabled ->
+                    powerUserState = powerUserState.copy(tapToSleep = enabled)
+                    scope.launch { powerUserRepo.setTapToSleep(enabled) }
+                },
+                onScreenshotGestureChange = { enabled ->
+                    powerUserState = powerUserState.copy(screenshotGesture = enabled)
+                    scope.launch { powerUserRepo.setScreenshotGesture(enabled) }
+                },
+                onHeadsUpChange = { enabled ->
+                    powerUserState = powerUserState.copy(headsUpEnabled = enabled)
+                    scope.launch { powerUserRepo.setHeadsUp(enabled) }
+                },
+                onHeadsUpTimeoutChange = { ms ->
+                    powerUserState = powerUserState.copy(headsUpTimeoutMs = ms)
+                    scope.launch { powerUserRepo.setHeadsUpTimeout(ms) }
+                },
+                onFlashlightBlinkChange = { enabled ->
+                    powerUserState = powerUserState.copy(flashlightBlinkOnCall = enabled)
+                    scope.launch { powerUserRepo.setFlashlightBlink(enabled) }
+                },
+                onAllowDowngradeChange = { enabled ->
+                    powerUserState = powerUserState.copy(allowAppDowngrade = enabled)
+                    scope.launch { powerUserRepo.setAllowAppDowngrade(enabled) }
+                },
+                onDisableHapticsChange = { enabled ->
+                    powerUserState = powerUserState.copy(disableHaptics = enabled)
+                    scope.launch { powerUserRepo.setDisableHaptics(enabled) }
+                },
+                onForceGpsChange = { enabled ->
+                    powerUserState = powerUserState.copy(forceGpsHighAccuracy = enabled)
+                    scope.launch { powerUserRepo.setForceGpsHighAccuracy(enabled) }
+                },
+                onRebootAction = { action ->
+                    powerUserState = powerUserState.copy(lastRebootAction = action.displayName)
+                    scope.launch { powerUserRepo.triggerReboot(action) }
+                },
+            )
         }
     }
 }

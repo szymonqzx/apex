@@ -1,0 +1,76 @@
+# apex_game_space.rc — installed at /vendor/etc/init/apex_game_space.rc
+# Game Space: enhanced gaming mode with FPS unlock, sensor block,
+# notification suppression, and auto-DND for immersive gaming.
+#
+# Builds on apex.gaming=1 from apex_power.rc — this RC adds the
+# power-user gaming features inspired by crDroid Game Space.
+#
+# Triggered by apex.game_space=1 property (set by Apex Control).
+# When apex.game_space=0, reverts all settings.
+
+# === Game Space ON ===
+on property:apex.game_space=1
+    # Core gaming mode (delegates to apex_power.rc gaming policy)
+    setprop apex.gaming 1
+
+    # FPS unlock: raise display refresh rate to max (120Hz)
+    # topaz/tapas AMOLED supports 120Hz — force it for gaming
+    setprop persist.sys.sf.max_refresh_rate 120
+    setprop debug.sf.frame_rate 120
+
+    # Disable auto-brightness during gaming (prevent mid-game brightness swings)
+    setprop apex.game.auto_brightness 0
+
+    # Sensor block: disable accelerometer/gyroscope for non-game apps
+    # (kernel apex_suspend_sensors feature, if available)
+    write /sys/kernel/apex_sensors/block_non_fg 1
+
+    # Notification suppression: heads-up disabled, ringer silenced
+    setprop apex.game.dnd 1
+
+    # Disable ADB over USB during gaming (security + reduce USB interrupts)
+    setprop persist.sys.usb.config charging
+
+    # CPU input boost: aggressive for touch latency
+    write /sys/kernel/apex_cpu_boost/boost_ms 50
+    write /sys/kernel/apex_cpu_boost/duration_ms 5000
+
+    # GPU: lock max frequency for sustained performance
+    write /sys/class/kgsl/kgsl-3d0/devfreq/min_freq 650000000
+    write /sys/class/kgsl/kgsl-3d0/devfreq/max_freq 650000000
+
+    # Disable ZRAM writeback during gaming (avoid I/O stalls)
+    write /sys/block/zram0/writeback 0
+
+# === Game Space OFF ===
+on property:apex.game_space=0
+    # Revert gaming mode
+    setprop apex.gaming 0
+
+    # Restore display refresh rate to auto
+    setprop persist.sys.sf.max_refresh_rate 0
+    setprop debug.sf.frame_rate 0
+
+    # Restore auto-brightness
+    setprop apex.game.auto_brightness 1
+
+    # Restore sensor access
+    write /sys/kernel/apex_sensors/block_non_fg 0
+
+    # Restore notifications
+    setprop apex.game.dnd 0
+
+    # Restore USB config
+    setprop persist.sys.usb.config adb
+
+    # Restore CPU boost to normal
+    write /sys/kernel/apex_cpu_boost/boost_ms 40
+    write /sys/kernel/apex_cpu_boost/duration_ms 1500
+
+    # Restore GPU governor
+    write /sys/class/kgsl/kgsl-3d0/devfreq/governor msm-adreno-tz
+    write /sys/class/kgsl/kgsl-3d0/devfreq/min_freq 320000000
+    write /sys/class/kgsl/kgsl-3d0/devfreq/max_freq 650000000
+
+    # Restore ZRAM writeback
+    write /sys/block/zram0/writeback 1
