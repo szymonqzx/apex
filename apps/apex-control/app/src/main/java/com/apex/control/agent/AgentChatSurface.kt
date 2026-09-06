@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -40,6 +41,7 @@ fun AgentChatSurface(
   var chatState by remember { mutableStateOf<ChatState>(ChatState.Idle) }
   var messages by remember { mutableStateOf(listOf<ChatMessage>()) }
   var consentCountdown by remember { mutableStateOf(60) }
+  var isRecording by remember { mutableStateOf(false) }
   val scope = rememberCoroutineScope()
 
   Column(
@@ -148,8 +150,35 @@ fun AgentChatSurface(
         modifier = Modifier.weight(1f),
         placeholder = { Text("Ask the agent...") },
         singleLine = true,
-        enabled = chatState !is ChatState.Processing,
+        enabled = chatState !is ChatState.Processing && !isRecording,
       )
+      // Push-to-talk voice input button
+      IconButton(
+        onClick = {
+          if (!isRecording) {
+            isRecording = true
+            scope.launch {
+              // Start voice recording via agent service
+              val transcript = repository.transcribeVoice()
+              isRecording = false
+              if (transcript.isNotBlank()) {
+                input = transcript
+              }
+            }
+          }
+        },
+        enabled = chatState !is ChatState.Processing && !isRecording,
+      ) {
+        Icon(
+          Icons.Default.Mic,
+          contentDescription = "Push to talk",
+          tint = if (isRecording) {
+            MaterialTheme.colorScheme.error
+          } else {
+            MaterialTheme.colorScheme.onSurface
+          },
+        )
+      }
       IconButton(
         onClick = {
           if (input.isNotBlank() && chatState !is ChatState.Processing) {

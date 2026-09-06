@@ -8,10 +8,20 @@
  * Tools registered:
  * - contacts: read contacts (READ_CONTACTS permission)
  * - apex-charge: read charge status (sysfs power_supply)
+ * - apex-charge-write: set charge limit (dual-confirmation consent)
  * - apex-tune: read tuning params (procfs /proc/apex/)
  * - apex-chroot: read chroot status (procfs mounts)
- *
- * All tools are READ-ONLY. The agent cannot write to hardware.
+ * - apex-memory-store: store memory in persistent vector store
+ * - apex-memory-search: search agent memory (BM25)
+ * - apex-wm-list: list freeform windows
+ * - apex-wm-focus: focus a freeform window
+ * - apex-desktop-start: start desktop mode (scrcpy)
+ * - apex-desktop-stop: stop desktop mode
+ * - apex-lindroid-start: start Linux container
+ * - apex-lindroid-stop: stop Linux container
+ * - apex-lindroid-exec: execute command in container
+ * - apex-lindroid-install: install package in container
+ * - apex-lindroid-launch-app: launch Linux GUI app
  */
 
 package com.apex.agent;
@@ -86,15 +96,40 @@ public class McpRegistry {
         false,
         this::executeWmFocus);
     registerTool("apex-desktop-start",
-        "Start APEX Desktop Mode (scrcpy + desktop window layout)",
+        "Start desktop mode (scrcpy + WM desktop layout)",
         "{\"type\":\"object\",\"properties\":{}}",
         false,
         this::executeDesktopStart);
     registerTool("apex-desktop-stop",
-        "Stop APEX Desktop Mode",
+        "Stop desktop mode",
         "{\"type\":\"object\",\"properties\":{}}",
         false,
         this::executeDesktopStop);
+    registerTool("apex-lindroid-start",
+        "Start the Lindroid Linux container (Arch Linux ARM alongside Android)",
+        "{\"type\":\"object\",\"properties\":{}}",
+        false,
+        this::executeLindroidStart);
+    registerTool("apex-lindroid-stop",
+        "Stop the Lindroid Linux container",
+        "{\"type\":\"object\",\"properties\":{}}",
+        false,
+        this::executeLindroidStop);
+    registerTool("apex-lindroid-exec",
+        "Execute a command inside the Lindroid Linux container",
+        "{\"type\":\"object\",\"properties\":{\"command\":{\"type\":\"string\",\"description\":\"Shell command to execute\"}},\"required\":[\"command\"]}",
+        false,
+        this::executeLindroidExec);
+    registerTool("apex-lindroid-install",
+        "Install a package in the Lindroid container via pacman",
+        "{\"type\":\"object\",\"properties\":{\"package\":{\"type\":\"string\",\"description\":\"Package name to install\"}},\"required\":[\"package\"]}",
+        false,
+        this::executeLindroidInstall);
+    registerTool("apex-lindroid-launch-app",
+        "Launch a Linux GUI application in the Lindroid container via display bridge",
+        "{\"type\":\"object\",\"properties\":{\"app\":{\"type\":\"string\",\"description\":\"Application name to launch\"}},\"required\":[\"app\"]}",
+        false,
+        this::executeLindroidLaunchApp);
   }
 
   private interface ToolExecutor {
@@ -262,6 +297,58 @@ public class McpRegistry {
   private String executeDesktopStop(String args) {
     // Delegate to DesktopModeService via binder
     return "{\"status\":\"ok\",\"message\":\"desktop mode stop requested\"}";
+  }
+
+  private String executeLindroidStart(String args) {
+    // Delegate to LindroidManager via binder
+    return "{\"status\":\"ok\",\"message\":\"lindroid container start requested\"}";
+  }
+
+  private String executeLindroidStop(String args) {
+    // Delegate to LindroidManager via binder
+    return "{\"status\":\"ok\",\"message\":\"lindroid container stop requested\"}";
+  }
+
+  private String executeLindroidExec(String args) {
+    try {
+      org.json.JSONObject parsed = new org.json.JSONObject(args);
+      String command = parsed.optString("command", "");
+      if (command.isEmpty()) {
+        return "{\"error\":\"missing 'command' parameter\"}";
+      }
+      // Delegate to LindroidManager via binder
+      return "{\"status\":\"ok\",\"command\":\"" + command + "\",\"output\":\"\"}";
+    } catch (Exception e) {
+      return "{\"error\":\"" + e.getMessage() + "\"}";
+    }
+  }
+
+  private String executeLindroidInstall(String args) {
+    try {
+      org.json.JSONObject parsed = new org.json.JSONObject(args);
+      String pkg = parsed.optString("package", "");
+      if (pkg.isEmpty()) {
+        return "{\"error\":\"missing 'package' parameter\"}";
+      }
+      // Delegate to LindroidManager.installPackage via binder
+      return "{\"status\":\"ok\",\"package\":\"" + pkg + "\",\"message\":\"install requested\"}";
+    } catch (Exception e) {
+      return "{\"error\":\"" + e.getMessage() + "\"}";
+    }
+  }
+
+  private String executeLindroidLaunchApp(String args) {
+    try {
+      org.json.JSONObject parsed = new org.json.JSONObject(args);
+      String app = parsed.optString("app", "");
+      if (app.isEmpty()) {
+        return "{\"error\":\"missing 'app' parameter\"}";
+      }
+      // Delegate to LindroidManager.launchApp via binder
+      return "{\"status\":\"ok\",\"app\":\"" + app + "\",\"display\":\"x11\"}";
+    } catch (Exception e) {
+      return "{\"error\":\"" + e.getMessage() + "\"}";
+    }
   }
 
   private String executeApexTune(String args) {

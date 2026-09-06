@@ -41,6 +41,7 @@ public class ApexAgentDaemon {
   private volatile boolean mModelLoaded = false;
   private String mCurrentModelPath;
   private String mCurrentModelId;
+  private MemoryManager mMemoryManager;
 
   // JNI — loaded from libllm_jni.so
   static {
@@ -94,6 +95,15 @@ public class ApexAgentDaemon {
       android.os.Process.setOomAdj(android.os.Process.myPid(), 900);
     } catch (Exception e) {
       Log.w(TAG, "Failed to set OOM adjustment: " + e.getMessage());
+    }
+
+    // Initialize persistent memory (SQLite + BM25 vector store)
+    try {
+      mMemoryManager = new MemoryManager();
+      Log.i(TAG, "Memory manager initialized: "
+          + mMemoryManager.getMemoryCount() + " memories");
+    } catch (Exception e) {
+      Log.w(TAG, "Memory manager init failed (non-fatal): " + e.getMessage());
     }
 
     // Load default model
@@ -180,6 +190,22 @@ public class ApexAgentDaemon {
         loadModel(modelId);
       }
 
+      // Inject relevant memories into the prompt context
+      String enrichedPrompt = prompt;
+      if (mMemoryManager != null) {
+        try {
+          String memoryContext = mMemoryManager.buildPromptContext(prompt);
+          if (!memoryContext.isEmpty()) {
+            enrichedPrompt = memoryContext + "\n\n" + prompt;
+            Log.d(TAG, "Injected " + memoryContext.length()
+                + " chars of memory context");
+          }
+        } catch (Exception e) {
+          Log.w(TAG, "Memory context injection failed (non-fatal): "
+              + e.getMessage());
+        }
+      }
+
       // Generate response with malformed-output handling (S2):
       // If the LLM produces invalid JSON in a tool call, re-prompt with
       // a format fix request. After MAX_REPROMPT_RETRIES (2), degrade to
@@ -187,13 +213,23 @@ public class ApexAgentDaemon {
       String response;
       if (mModelLoaded && mModelHandle != 0) {
         try {
-          response = generateWithRetry(prompt, 256, 0.7f);
+          response = generateWithRetry(enrichedPrompt, 256, 0.7f);
         } catch (UnsatisfiedLinkError e) {
           response = "[stub] Model inference not available (JNI not loaded).";
         }
       } else {
         // No model — degrade to plain text fallback
         response = "[fallback] No model loaded. Prompt was: " + prompt;
+      }
+
+      // Store conversation summary in memory for future context
+      if (mMemoryManager != null) {
+        try {
+          String summary = prompt.length() > 100
+              ? prompt.substring(0, 100) : prompt;
+          mMemoryManager.storeConversationSummary(summary);
+        } catch (Exception ignored) {
+        }
       }
 
       // Send response
@@ -282,6 +318,12 @@ public class ApexAgentDaemon {
       }
       mModelHandle = 0;
       mModelLoaded = false;
+    }
+    if (mMemoryManager != null) {
+      try {
+        mMemoryManager.close();
+      } catch (Exception ignored) {
+      }
     }
     Log.i(TAG, "apexagentd stopped");
   }

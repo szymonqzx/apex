@@ -108,6 +108,21 @@ class AgentRepository(private val client: BridgeClient = BridgeClient()) {
   }
 
   /**
+   * Transcribe voice input via the agent's whisper.cpp JNI bridge.
+   * Records audio from the microphone and returns the transcript.
+   * Returns empty string on failure.
+   */
+  suspend fun transcribeVoice(): String = withContext(Dispatchers.IO) {
+    try {
+      val result = client.sendCommand("agent transcribe")
+      val json = JSONObject(result)
+      json.optString("transcript", "")
+    } catch (e: Exception) {
+      ""
+    }
+  }
+
+  /**
    * Download a model.
    */
   suspend fun downloadModel(modelId: String): DownloadProgress = withContext(Dispatchers.IO) {

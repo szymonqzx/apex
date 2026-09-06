@@ -399,6 +399,67 @@ for file in "app/src/main/AndroidManifest.xml" \
   fi
 done
 
+# --- Lindroid completion ---------------------------------------------------
+echo ""
+echo "--- Lindroid completion ---"
+for file in \
+"java/com/apex/lindroid/LindroidManager.java" \
+"java/com/apex/lindroid/ContainerConfig.java" \
+"java/com/apex/lindroid/DisplayBridge.java" \
+"aidl/com/apex/lindroid/ILindroid.aidl"; do
+  if [ -f "$APEX/lindroid/$file" ]; then
+    ok "  lindroid/$file"
+  else
+    fail "  lindroid/$file missing"
+  fi
+done
+
+# Lindroid MCP tools
+if grep -q 'apex-lindroid-start' "$APEX/agent/java/com/apex/agent/McpRegistry.java" 2>/dev/null; then
+  ok "  Lindroid MCP tools registered"
+else
+  fail "  Lindroid MCP tools not in McpRegistry"
+fi
+
+# --- Agent enhancements ---------------------------------------------------
+echo ""
+echo "--- Agent enhancements ---"
+# ConsentGate consent types
+if grep -q 'REMOTE_INFERENCE' "$APEX/agent/java/com/apex/agent/ConsentGate.java" 2>/dev/null; then
+  ok "  ConsentGate REMOTE_INFERENCE"
+else
+  fail "  ConsentGate REMOTE_INFERENCE missing"
+fi
+if grep -q 'DUAL_CONFIRM' "$APEX/agent/java/com/apex/agent/ConsentGate.java" 2>/dev/null; then
+  ok "  ConsentGate DUAL_CONFIRM"
+else
+  fail "  ConsentGate DUAL_CONFIRM missing"
+fi
+# Memory manager wired into daemon
+if grep -q 'mMemoryManager' "$APEX/agent/java/com/apex/agent/ApexAgentDaemon.java" 2>/dev/null; then
+  ok "  MemoryManager wired into daemon"
+else
+  fail "  MemoryManager not wired into ApexAgentDaemon"
+fi
+# Push-to-talk
+if grep -q 'transcribeVoice\|Icons.Default.Mic' "$APEX/apps/apex-control/app/src/main/java/com/apex/control/agent/AgentChatSurface.kt" 2>/dev/null; then
+  ok "  Push-to-talk in AgentChatSurface"
+else
+  fail "  Push-to-talk not in AgentChatSurface"
+fi
+# Vector store test
+if [ -f "$APEX/tests/agent/test_vector_store.py" ]; then
+  ok "  test_vector_store.py"
+else
+  fail "  test_vector_store.py missing"
+fi
+# Daily-driver verification script
+if [ -f "$APEX/tools/verify-daily-driver.sh" ]; then
+  ok "  verify-daily-driver.sh"
+else
+  fail "  verify-daily-driver.sh missing"
+fi
+
 # --- Summary ---------------------------------------------------------------
 echo ""
 echo "=== Verification complete ==="
