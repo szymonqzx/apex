@@ -1,6 +1,6 @@
 # APEX Development Roadmap
 
-**Version**: 1.0 — 2026-09-07
+**Version**: 1.1 — 2026-09-07 (v1.1 adds Phase 1b — the kernel feature bounty)
 **Branch**: feat/zepharo-rebase
 **Device**: Redmi Note 12 4G (topaz/tapas), SM6225-AD
 **Companion docs**: `BOIL_THE_SEA_PLAN_V2.md` (implementation plan, gap table),
@@ -96,7 +96,7 @@ no panic record) is being bisected; the decisive experiment is already built.
 
 ---
 
-## Phase 1 — Kernel stabilization + root/hiding parity
+## Phase 1 — Kernel stabilization (the stable core)
 
 **Goal**: APEX kernel is a daily driver: stable, fully featured, hiding stack
 works against the user's banking stack.
@@ -118,9 +118,9 @@ works against the user's banking stack.
 4. **Defconfig strategy decision (D1)** — keep `apex_defconfig` or move to
    GKI-style (`gki_defconfig` + delta fragment) per the research. Either way
    HZ=250, PREEMPT, CMDLINE already aligned; validate KMI preservation.
-5. **Performance/upstream** — LTO=thin local default; AutoFDO profile (G8);
-   touch pipeline research (G7); benchmark vs Ecstasy 5.15.202 baseline
-   (Geekbench, battery drain, thermals).
+5. **Performance/upstream baseline** — LTO=thin local default; benchmark vs
+   Ecstasy 5.15.202 baseline (Geekbench, battery drain, thermals, app
+   cold-start); AutoFDO profile collection (G8).
 
 ### Exit criteria
 
@@ -129,6 +129,169 @@ works against the user's banking stack.
 - Play Integrity STRONG; all 5 banking apps function
 - `make verify`/`make test` green at every commit; CI matrix
   (plain/ksu/susfs/bbg/thermal/full) green
+- **Baseline benchmarks captured** — every feature added in Phase 1b must
+  beat (or tie) this baseline; regressions block the merge
+
+---
+
+## Phase 1b — Kernel feature bounty (the plentiful kernel)
+
+**Goal**: APEX becomes the most feature-rich kernel for the device family —
+without losing the "cleanest engineering" crown. Features are
+config-guarded so every one can be bisected independently
+(`stages-features.txt` extends `stages-gki.txt`).
+
+**Governance**: each feature needs (a) a `check-configs.py` entry, (b) a
+`verify.sh` check, (c) a cert test where testable, (d) a benchmark or
+measurement against the Phase 1 baseline, (e) a docs/FEATURES.md row.
+Status legend: **HAVE** (in apex_defconfig/base already), **PORT**
+(port from an ecosystem kernel with a source), **NEW** (APEX-original),
+**RESEARCH** (investigate before committing — may not pan out on SM6225).
+
+### 1. Scheduler & CPU
+
+| Feature | Status | Pri | Effort | Notes |
+|---|---|---|---|---|
+| WALT scheduler | HAVE | — | — | `apex-walt-scheddebug` guards SCHED_DEBUG |
+| Schedhorizon governor | HAVE | — | — | In zepharo base (`CONFIG_CPU_FREQ_GOV_SCHEDHORIZON=y`) |
+| EAS + energy model | HAVE | — | — | `CONFIG_ENERGY_MODEL=y` |
+| schedutil tuning | PORT | P1 | S | Tune up/down thresholds, rate limits |
+| CPU input boost / touch boost | PORT | P1 | S | From Zephyr-lineage kernels; validate with touch pipeline (G7) |
+| E-cores/P-cores affinity policy | NEW | P2 | M | `apex-thermald-cores` groundwork; per-foreground-app affinity via apex sysfs |
+| Forced lazy RCU | PORT | P2 | S | ChicKernel |
+| Power-efficient workqueues | PORT | P2 | S | ChicKernel |
+| Boeffla wakelock blocker | PORT | P2 | M | ChicKernel; sysfs list |
+| Devfreq governor tuning (DDR/GPU) | PORT | P2 | M | Validate on khaje devfreq nodes |
+| HMP/energy-aware placement tuning | PORT | P3 | M | Measured against baseline |
+
+### 2. Memory & reclaim
+
+| Feature | Status | Pri | Effort | Notes |
+|---|---|---|---|---|
+| MGLRU | HAVE | — | — | `CONFIG_LRU_GEN` + ENABLED |
+| KSM | HAVE | — | — | + ksmd tuning for 4GB |
+| ZRAM zstd + writeback | HAVE | — | — | `CONFIG_ZRAM_WRITEBACK`; add a sysfs policy (NEW) |
+| DAMON reclaim | HAVE | — | — | `CONFIG_DAMON_RECLAIM`; wire to apex sysfs (NEW) |
+| 4GB LMK/psi tuning | PORT | P1 | M | ChicKernel "tuned memory management for 4GB" + PSI thresholds |
+| VMA/slab micro-opts | PORT | P3 | M | Only with measured gains |
+| zswap (alternative to zram) | RESEARCH | P3 | S | Compare vs ZRAM on this SoC |
+
+### 3. I/O & filesystems
+
+| Feature | Status | Pri | Effort | Notes |
+|---|---|---|---|---|
+| F2FS compression suites | HAVE | — | — | lz4/lz4hc/lzo/zstd + DIO opts in base |
+| EROFS | HAVE | — | — | For future read-only partitions |
+| exFAT | HAVE | — | — | Native driver |
+| SSG I/O scheduler | PORT | P1 | M | ChicKernel default; bench vs mq-deadline |
+| I/O latency QoS tuning | PORT | P2 | M | blk-mq + qcom blk crypto |
+| Readahead / reclaim-governed IO | PORT | P3 | S | Bench cold-start |
+
+### 4. Network & netfilter
+
+| Feature | Status | Pri | Effort | Notes |
+|---|---|---|---|---|
+| BBRv3 + tcp_plb | HAVE | — | — | In zepharo base |
+| WireGuard | HAVE | — | — | Built-in |
+| Westwood default TCP | PORT | P2 | S | ChicKernel default; keep BBR selectable |
+| **nftables** | NEW | P1 | M | **GAP: not enabled** (only legacy iptables/xtables today) — enable `CONFIG_NFT_*` for modern firewall apps |
+| TUN | HAVE | — | — | VPN clients |
+| MPTCP | RESEARCH | P3 | L | Nebula has it; heavy, needs kernel 5.15 MPTCP backport + validation |
+| Netfilter extras (owner/mark/socket) | HAVE | — | — | Xtables set is already extensive |
+
+### 5. Power, battery & thermal
+
+| Feature | Status | Pri | Effort | Notes |
+|---|---|---|---|---|
+| Charge limit (bq2589x) | HAVE | — | — | `apex-charge`, CHARGE_CONTROL_END_THRESHOLD |
+| Fuel gauge sm5602 | HAVE | — | — | Native in base (io-channel fixed) |
+| Battery auth (ds28e16) | HAVE | — | — | In `apex-device-backports` |
+| Thermal learner | HAVE | — | — | History ring + tunable trips |
+| mi_thermald P-core redirect | HAVE | — | — | `apex-thermald-cores` |
+| PMIC WDT + safe mode | HAVE | — | — | `apex-wdt` |
+| Charge/thermal power dashboard sysfs | NEW | P1 | M | APEX-original: unified `/sys/class/apex/power/*` |
+| Battery idle mode (charging pause/resume) | NEW | P2 | M | Extend bq2589x with idle + pulse charging policy |
+| USB fast-charge policy control | NEW | P2 | M | tcpm/bq2589x sysfs policy |
+| Devfreq thermal governors | PORT | P3 | M | Align with thermal learner |
+
+### 6. Display, GPU & audio
+
+| Feature | Status | Pri | Effort | Notes |
+|---|---|---|---|---|
+| KCAL color control | PORT | P2 | M | Port from MSM display lineage; needs driver support check (RESEARCH first) |
+| HBM (high-brightness mode) | PORT | P3 | M | Panel/backlight driver support check |
+| Adreno/GPU DVFS tuning | PORT | P2 | M | kgsl devfreq; validate on khaje |
+| Panel refresh/backlight curve | PORT | P3 | S | DSI panel tuning |
+| Audio gain control | RESEARCH | P3 | M | Mostly userspace (mixer paths); skip if HAL covers it |
+
+### 7. Security & hardening (APEX DNA)
+
+| Feature | Status | Pri | Effort | Notes |
+|---|---|---|---|---|
+| CFI + SCS | HAVE | — | — | + shadow call stack |
+| Stack protector strong | HAVE | — | — | |
+| Lockdown LSM | HAVE | — | — | Not force-enabled; decide policy (D8) |
+| Baseband guard (BBG) | HAVE | — | — | `apex-baseband-guard` |
+| KMI protection (MODVERSIONS) | HAVE | — | — | Matches gki_defconfig |
+| Module signing | HAVE | — | — | SIG + SIG_PROTECT, SHA1 |
+| KVM | HAVE | — | — | `CONFIG_KVM=y` — explore on-device VMs (RESEARCH) |
+| Hardened usercopy / refcount | PORT | P2 | S | Upstream hardening backports |
+| SELinux strict (ROM side) | HAVE | — | — | Neverallow audits in Phase 2 |
+| IMA / fs-verity | RESEARCH | P3 | L | Heavy; fs-verity more tractable for ROM |
+
+### 8. Root & hiding
+
+| Feature | Status | Pri | Effort | Notes |
+|---|---|---|---|---|
+| KernelSU-Next | HAVE | — | — | `apex-root` |
+| SUSFS (path/mount/kstat/maps/cmdline) | HAVE | — | — | Cmdline spoof in hiding stack v1.1.0 |
+| TrickyStore + yurikey + zygisk_next + HMA | HAVE | — | — | `releases/apex-hiding-stack-1.1.0.zip` |
+| lineage-hider (Xposed) | HAVE | — | — | |
+| Play Integrity STRONG | P0 target | — | — | Phase 1a gate |
+| ReSukiSU alternative | RESEARCH | P3 | M | Zepharo lineage uses it; evaluate vs KSU-Next |
+| KSU module manager (in-kernel) | NEW | P2 | M | Signed-module gate for KSU modules (APEX-original) |
+
+### 9. Diagnostics & tooling
+
+| Feature | Status | Pri | Effort | Notes |
+|---|---|---|---|---|
+| pstore/ramoops (placement fix) | P0 | — | — | Phase 0 gate; Ecstasy moves to 9ff00000 |
+| PMIC WDT bootreason | HAVE | — | — | safe-mode basis |
+| KPROBES/FTRACE | HAVE | — | — | Dev builds |
+| Boot-time tracing (bootconfig) | NEW | P2 | S | `bootconfig` initramfs support |
+| drgn/vmcore analysis | PORT | P2 | M | osandov/drgn on pstore dumps |
+| Apex sysfs + thermal history | HAVE | — | — | |
+
+### 10. Novel APEX features (differentiators)
+
+| Feature | Status | Pri | Effort | Notes |
+|---|---|---|---|---|
+| `/sys/class/apex/*` control plane | HAVE | — | — | Version/base/features nodes |
+| Unified power dashboard sysfs | NEW | P1 | M | charge+thermal+battery in one tree |
+| Feature-flags sysfs (runtime toggles) | NEW | P1 | M | Gate features at runtime for bisection on-device |
+| KSU module signing | NEW | P2 | M | Above (8) |
+| Boot-profile system (per-mode kernel profiles) | NEW | P2 | L | Performance/battery/balanced sysfs profiles |
+| `apex_thermal_learner.sh` (+/-2C) | HAVE | — | — | |
+
+### Phase 1b acceptance
+
+- All P0/P1 features shipped with docs/FEATURES.md rows, verify checks, and
+  baseline-beating measurements
+- Feature matrix CI job: every config-guarded feature compiles in its own
+  stage (extends the WildKernels-style matrix)
+- No regressions: cert suite grows past 150; 7-day soak repeats after the
+  bounty lands
+- Every RESEARCH item either promoted (with evidence) or explicitly dropped
+  with the reason recorded
+
+### Phase 1b risks
+
+| Risk | Mitigation |
+|---|---|
+| Feature bloat destabilizes the kernel | Config-guard everything; bisection stages; one feature per merge |
+| Ports from other SoCs don't apply to khaje | RESEARCH gate: driver-support check before PORT |
+| Benchmark noise on a 4GB device | Controlled runs (same ROM, same ambient), 3-run median |
+| MPTCP/KVM/LRNG soak time | Keep P3/RESEARCH; no deadline pressure |
 
 ---
 
@@ -235,16 +398,18 @@ overlays, hiding stack, and agent services integrated.
 ## Critical path
 
 ```
-Phase 0 (boot) ──► Phase 1 (stabilize) ──► Phase 2 (ROM) ──► Phase 4 (release)
-                        │                       ▲
-                        └── Phase 3 (agent) ────┘   (agent apps can start
-                                                      in parallel; kernel
-                                                      root needed for device)
+Phase 0 (boot) ──► Phase 1 (stabilize) ──► Phase 1b (feature bounty)
+        │                │                        │
+        │                └──► Phase 2 (ROM) ◄─────┘   (bounty P1 features
+        │                                              land before ROM freeze)
+        └──► Phase 3 (agent) ──► Phase 4 (release)
 ```
 
 Phase 3's app-side work can begin before Phase 1 completes (static dev +
 emulator), but device validation needs a booting kernel. Phase 4 gates on
-Phase 1 (stability is the release currency).
+Phase 1 + 1b (stability and the feature set are the release currency). Phase 2
+freezes on the Phase 1b P1 feature set so the ROM ships the bounty, not a
+moving target.
 
 ## Decisions needed (open, owner: user)
 
@@ -257,6 +422,8 @@ Phase 1 (stability is the release currency).
 | D5 | Repo visibility: private → public timeline | Phase 4.1 | private until v1.0 |
 | D6 | Zip module default after on-device evidence | Phase 1.1 | APEX_NO_MODULES=1 if dlkm works |
 | D7 | Helios coordination scope | Phase 4.4 | tester + patch exchange |
+| D8 | Lockdown LSM policy (force-enable vs permissive) | Phase 1b §7 | permissive until ROM lands |
+| D9 | Feature-bounty scope for v1.0 (which P2/P3 rows ship) | Phase 1b | P0/P1 mandatory; P2 on evidence |
 
 ## References
 
