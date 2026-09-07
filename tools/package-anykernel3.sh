@@ -12,7 +12,15 @@ VERSION="0.4.0-zepharo"
 ZIP_NAME="apex-kernel-${VERSION}-anykernel3.zip"
 ZIP_DIR="/tmp/apex-ak3-build"
 
+# Module policy (research 2026-09-07, docs/TOOLING.md): the proven kernels
+# for this device (Ecstasy/YASK/Helios) ship NO modules — the ROM provides
+# vendor dlkm partitions. APEX_NO_MODULES=1 produces the lean ~45MB zip;
+# the default keeps shipping our 491 modules until on-device module
+# compatibility is proven.
+NO_MODULES="${APEX_NO_MODULES:-0}"
+
 echo "=== Packaging AnyKernel3 zip v${VERSION} ==="
+echo "  modules:  $([ "$NO_MODULES" = "1" ] && echo "NONE (APEX_NO_MODULES=1, ROM dlkm)" || echo "shipped ($(find "$OUT" -name '*.ko' 2>/dev/null | wc -l) .ko)")"
 
 # 1. Prepare build directory
 rm -rf "$ZIP_DIR"
@@ -43,13 +51,17 @@ if [ -f "$DTBO" ]; then
   echo "  [OK] dtbo.img copied"
 fi
 
-# 5. Copy modules and generate depmod metadata
+# 5. Copy modules and generate depmod metadata (skipped with APEX_NO_MODULES=1)
 MODULE_COUNT=0
-for ko in $(find "$OUT" -name "*.ko" 2>/dev/null); do
-  cp "$ko" "$ZIP_DIR/modules/"
-  MODULE_COUNT=$((MODULE_COUNT + 1))
-done
-echo "  [INFO] $MODULE_COUNT modules copied"
+if [ "$NO_MODULES" = "1" ]; then
+  echo "  [INFO] modules skipped (APEX_NO_MODULES=1 — ROM provides vendor dlkm)"
+else
+  for ko in $(find "$OUT" -name "*.ko" 2>/dev/null); do
+    cp "$ko" "$ZIP_DIR/modules/"
+    MODULE_COUNT=$((MODULE_COUNT + 1))
+  done
+  echo "  [INFO] $MODULE_COUNT modules copied"
+fi
 
 # Generate modules.dep and related metadata so modprobe works at boot.
 # This is critical — without modules.dep, the init system cannot resolve
@@ -58,7 +70,7 @@ if [ "$MODULE_COUNT" -gt 0 ]; then
   echo "  [INFO] Generating depmod metadata..."
 
   # Use the kernel version from the built Image
-  KVER=$(strings "$OUT/arch/arm64/boot/Image" 2>/dev/null | \
+  KVER=$(strings "$OUT/arch/arm64/boot/Image" 2>/dev/null |
     grep -oP 'Linux version \K[0-9]+\.[0-9]+\.[0-9]+' | head -1)
   if [ -z "$KVER" ]; then
     KVER="5.15.211"
@@ -95,11 +107,15 @@ if [ "$MODULE_COUNT" -gt 0 ]; then
   fi
 fi
 
-# 6. Create module load script for ordered loading during boot
+# 6. Create module load script for ordered loading during boot (only when
+# modules are shipped — with APEX_NO_MODULES=1 the ROM's dlkm handles it)
 # This script is placed in /vendor/bin/ and called from init.rc
 # It loads critical modules in the correct order before the rest
 # are loaded by the ROM's init system via modprobe.
-cat > "$ZIP_DIR/modules/apex-load-modules.sh" << 'LOADSCRIPT'
+if [ "$NO_MODULES" = "1" ]; then
+  rm -f "$ZIP_DIR/modules/apex-load-modules.sh"
+else
+  cat >"$ZIP_DIR/modules/apex-load-modules.sh" <<'LOADSCRIPT'
 #!/system/bin/sh
 # apex-load-modules.sh — ordered module loading for APEX kernel
 # Called from init.rc on boot to load critical modules in order.
@@ -171,8 +187,9 @@ done
 
 setprop sys.apex.modules.status "loaded:${LOADED}:failed:${FAILED}" 2>/dev/null
 LOADSCRIPT
-chmod 755 "$ZIP_DIR/modules/apex-load-modules.sh"
-echo "  [OK] apex-load-modules.sh created"
+  chmod 755 "$ZIP_DIR/modules/apex-load-modules.sh"
+  echo "  [OK] apex-load-modules.sh created"
+fi
 
 # 6. Create the zip
 cd "$ZIP_DIR"
@@ -183,6 +200,10 @@ echo "  Size: $(du -h "$APEX/$ZIP_NAME" | cut -f1)"
 echo "  Contents:"
 echo "    - zImage (kernel Image, 5.15.211 Zepharo branch)"
 [ -f "$ZIP_DIR/dtbo.img" ] && echo "    - dtbo.img"
-echo "    - modules/ ($MODULE_COUNT .ko files)"
+if [ "$NO_MODULES" = "1" ]; then
+  echo "    - no modules (ROM vendor dlkm provides them)"
+else
+  echo "    - modules/ ($MODULE_COUNT .ko files)"
+fi
 echo ""
 echo "  Flash via: adb push $ZIP_NAME /sdcard/ && flash in recovery"
