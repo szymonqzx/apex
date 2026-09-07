@@ -1,0 +1,43 @@
+name: Feature request
+description: Propose a new feature for the APEX kernel or ROM
+title: "[feature] "
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Feature requests are welcome. For kernel features, prefer a concrete
+        proposal: what config, what sysfs ABI, what it improves.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / motivation
+      description: What gap does this fill?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: API/sysfs/UX sketch, expected behavior, edge cases.
+    validations:
+      required: true
+  - type: dropdown
+    id: layer
+    attributes:
+      label: Layer
+      options:
+        - Kernel (patches/apex-new)
+        - Defconfig
+        - ROM overlay (rom-overlays)
+        - Hiding stack (hiding/)
+        - Apps (apps/)
+        - Tooling / CI
+        - Device tooling (tools/device)
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What else did you try or consider?

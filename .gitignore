@@ -38,6 +38,9 @@ clang-r*/
 aarch64-linux-gnu-*/
 arm-linux-gnueabi-*/
 
+# Build cache (ccache)
+.ccache/
+
 # Source clones
 kernel/
 chroot/rootfs/rootfs/

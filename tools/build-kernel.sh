@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # tools/build-kernel.sh — build the APEX kernel for Redmi Note 12 4G (topaz)
 #
-# Base: Zepharo R9 (topnotchfreaks/kernel_msm-5.15, Linux 5.15.170)
+# Base: Zepharo R9 (topnotchfreaks/kernel_msm-5.15, Linux 5.15.211)
 #
 # Usage: ./build-kernel.sh [--clean] [--dry-run] [--modules] [--version]
 #   --clean:   force full rebuild (default: incremental)
@@ -46,12 +46,24 @@ if [ "$SHOW_VERSION" -eq 1 ]; then
   echo "  git:     $GIT_HASH"
   echo "  date:    $BUILD_DATE"
   echo "  target:  Redmi Note 12 4G (topaz/tapas)"
-  echo "  kernel:  Linux 5.15.170 (Zepharo R9, CAF msm-5.15)"
+  echo "  kernel:  Linux 5.15.211 (Zepharo R9, CAF msm-5.15)"
   echo "  base:    $(cat "$KERNEL/.apex-base" 2>/dev/null | grep 'Source:' || echo 'unknown')"
   exit 0
 fi
 
 JOBS=$(nproc)
+
+# --- Optional ccache (build cache: big speedup on repeat builds) ---
+# Enabled automatically when ccache is on PATH (GitHub runners ship it).
+# Cache dir defaults to $APEX/.ccache (gitignored); override with CCACHE_DIR.
+CCACHE_CMD=""
+if command -v ccache >/dev/null 2>&1; then
+  CCACHE_CMD="ccache "
+  export CCACHE_DIR="${CCACHE_DIR:-$APEX/.ccache}"
+  export CCACHE_SLOPPINESS="${CCACHE_SLOPPINESS:-time_macros,pch_defines,include_file_ctime,include_file_mtime}"
+  mkdir -p "$CCACHE_DIR"
+  echo "  ccache: enabled (dir=$CCACHE_DIR)"
+fi
 
 # --- Toolchain dependency checks ---
 check_toolchain() {
@@ -198,7 +210,7 @@ if [ "$DRY_RUN" -eq 0 ]; then
     make O="$OUT" ARCH=arm64 -j"$JOBS" \
       CROSS_COMPILE=aarch64-linux-gnu- \
       CROSS_COMPILE_COMPAT=aarch64-linux-gnu- \
-      CC=clang \
+      CC="${CCACHE_CMD}clang" \
       AR=llvm-ar \
       NM=llvm-nm \
       OBJCOPY=llvm-objcopy \
@@ -212,7 +224,7 @@ if [ "$DRY_RUN" -eq 0 ]; then
     make O="$OUT" ARCH=arm64 -j"$JOBS" \
       CROSS_COMPILE=aarch64-linux-gnu- \
       CROSS_COMPILE_COMPAT=aarch64-linux-gnu- \
-      CC=clang \
+      CC="${CCACHE_CMD}clang" \
       AR=llvm-ar \
       NM=llvm-nm \
       OBJCOPY=llvm-objcopy \
@@ -244,6 +256,11 @@ if [ "$DRY_RUN" -eq 0 ] && [ "$MODULES_ONLY" -eq 0 ]; then
     echo ""
     MODULE_COUNT=$(find "$OUT" -name "*.ko" | wc -l)
     echo "  Modules: $MODULE_COUNT"
+    if [ -n "$CCACHE_CMD" ]; then
+      echo ""
+      echo "  ccache stats:"
+      ccache -s | grep -E '(cache hit|cache miss|files in cache)' | sed 's/^/    /'
+    fi
     echo ""
     echo "  Next: ./tools/package-anykernel3.sh"
   else

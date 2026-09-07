@@ -1,0 +1,39 @@
+{
+  // APEX project config for Devin CLI agents.
+  // Permissions are additive to the user-level config; nothing here can
+  // grant what a higher level denies. Keep agents productive but bounded:
+  // git history rewrites and device-destructive commands stay in "ask".
+  "permissions": {
+    "allow": [
+      "Read(**)",
+      "Edit(patches/**)",
+      "Edit(defconfig/**)",
+      "Edit(tools/**)",
+      "Edit(docs/**)",
+      "Edit(tests/**)",
+      "Edit(rom-overlays/**)",
+      "Exec(git status)",
+      "Exec(git diff)",
+      "Exec(git log)",
+      "Exec(git add *)",
+      "Exec(git commit *)",
+      "Exec(bash tools/*)",
+      "Exec(make *)",
+      "Exec(python3 -m pytest *)",
+      "Exec(python3 tools/*)"
+    ],
+    "ask": [
+      "Exec(git push *)",
+      "Exec(git reset *)",
+      "Exec(git rebase *)",
+      "Exec(rm -rf *)",
+      "Exec(bash tools/device/flash-boot.sh *)",
+      "Exec(bash tools/device/bisect-kernel.sh *)"
+    ],
+    "deny": [
+      "Exec(git push --force*)",
+      "Exec(git push -f*)",
+      "Exec(sudo *)"
+    ]
+  }
+}

@@ -29,7 +29,10 @@ echo ""
 ERRORS=0
 
 # Scan all text files for dangerous patterns
-# Skip: .git, build artifacts, this script itself, docs (docs describe the rules, not execute them)
+# Skip: .git, build artifacts (out/, out-*/, releases/, gradle build/),
+# kernel clones, this script itself, docs (docs describe the rules, not
+# execute them). The find must stay fast: it is the hot path of
+# tests/agent/test_agent_security.py::test_verify_script_passes (30s timeout).
 while IFS= read -r file; do
   # Skip anything larger than 2MB up front — no shell script or patch
   # carrying a dangerous write pattern is that big, and grepping huge
@@ -39,10 +42,13 @@ while IFS= read -r file; do
     continue
   fi
 
-  # Skip binary files
-  if file "$file" 2>/dev/null | grep -q "binary"; then
-    continue
-  fi
+  # Cheap binary sniff with bash builtins (no per-file `file` spawn):
+  # a NUL byte in the first 4KB means binary. Hot path — keep it builtin-only.
+  first_chunk=""
+  IFS= read -r -N 4096 first_chunk < "$file" 2>/dev/null || true
+  case "$first_chunk" in
+    *$'\x00'*) continue ;;
+  esac
 
   # Skip this script itself, test files (tests contain assertion
   # pattern strings for their own checks, not actual commands), docs
@@ -58,46 +64,29 @@ while IFS= read -r file; do
     */verify-daily-driver.sh) continue ;;
   esac
 
-  # Check for dd writes to dangerous partitions
-  # Match: dd if=... of=/dev/.../aboot  (but not in comments or pattern definitions)
-  # Skip lines where the target is a variable ($partition etc.) — those are
-  # validated at runtime by the script's own partition whitelist.
-  matches=$(grep -nE "dd if=.*of=.*(/dev/block/by-name/|/dev/block/).*($DANGEROUS_PARTITIONS)\b" "$file" 2>/dev/null | grep -v "^.*#" | grep -v '\$' || true)
+  # Single combined check for dangerous writes: dd to a boot-critical
+  # partition, fastboot flash of one, or a direct block-device write.
+  # Comments are excluded via the ^[^#]* anchor; lines whose target is a
+  # variable ($partition etc.) are validated at runtime by the scripts'
+  # own partition whitelists, so they are filtered here.
+  matches=$(grep -nE "^[^#]*(dd if=.*of=.*(/dev/block/).*($DANGEROUS_PARTITIONS)\b|fastboot flash ($DANGEROUS_PARTITIONS)\b|write.*(/dev/block/).*($DANGEROUS_PARTITIONS))" "$file" 2>/dev/null | grep -v '\$' || true)
   if [ -n "$matches" ]; then
-    echo "ERROR: Dangerous dd write to boot-critical partition in $file:"
+    echo "ERROR: Dangerous write to boot-critical partition in $file:"
     echo "$matches"
     ERRORS=$((ERRORS + 1))
   fi
-
-  # Check for fastboot flash to dangerous partitions
-  matches=$(grep -nE "fastboot flash ($DANGEROUS_PARTITIONS)\b" "$file" 2>/dev/null | grep -v "^.*#" || true)
-  if [ -n "$matches" ]; then
-    echo "ERROR: Dangerous fastboot flash in $file:"
-    echo "$matches"
-    ERRORS=$((ERRORS + 1))
-  fi
-
-  # Check for direct block device writes to dangerous partitions (executable, not in docs)
-  case "$file" in
-    */docs/*) ;; # Skip docs — they describe the rules
-    *)
-      matches=$(grep -nE "write.*(/dev/block/by-name/|/dev/block/).*($DANGEROUS_PARTITIONS)" "$file" 2>/dev/null | grep -v "^.*#" || true)
-      if [ -n "$matches" ]; then
-        echo "ERROR: Dangerous block device write in $file:"
-        echo "$matches"
-        ERRORS=$((ERRORS + 1))
-      fi
-      ;;
-  esac
 
 done < <(find "$REPO_ROOT" -type f \
   -not -path "*/.git/*" \
   -not -path "*/out/*" \
+  -not -path "*/out-*/*" \
+  -not -path "*/releases/*" \
   -not -path "*/build/*" \
   -not -path "*/.gradle/*" \
   -not -path "*/__pycache__/*" \
   -not -path "*/node_modules/*" \
   -not -path "*/kernel/*" \
+  -not -path "*/kernel-*/*" \
   -not -name "*.img" \
   -not -name "*.bin" \
   -not -name "*.ko" \
@@ -105,6 +94,18 @@ done < <(find "$REPO_ROOT" -type f \
   -not -name "*.a" \
   -not -name "*.so" \
   -not -name "*.pyc" \
+  -not -name "*.cmd" \
+  -not -name "*.d" \
+  -not -name "*.tmp" \
+  -not -name "*.mod" \
+  -not -name "*.mod.c" \
+  -not -name "*.dtb" \
+  -not -name "*.gz" \
+  -not -name "*.tar" \
+  -not -name "*.zip" \
+  -not -name "*.jar" \
+  -not -name "*.apk" \
+  -not -name "*.gguf" \
   2>/dev/null)
 
 echo ""

@@ -1,0 +1,9 @@
+# Default owner for all paths — single-maintainer project.
+* @szymonqzx
+
+# Kernel patch series is the most sensitive area; require explicit review.
+patches/ @szymonqzx
+defconfig/ @szymonqzx
+
+# Flash/device tooling touches real hardware — maintainer-owned.
+tools/device/ @szymonqzx

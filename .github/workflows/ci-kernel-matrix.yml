@@ -37,7 +37,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y gcc-aarch64-linux-gnu \
-            binutils-aarch64-linux-gnu zip bc bison flex libssl-dev libelf-dev aria2
+            binutils-aarch64-linux-gnu ccache zip bc bison flex libssl-dev \
+            libelf-dev aria2
 
       - name: Fetch AOSP clang r547379 (the device-tested toolchain)
         run: |
@@ -47,6 +48,27 @@ jobs:
           tar -xzf clang-r547379.tar.gz -C clang-r547379
           echo "$PWD/clang-r547379/bin" >> "$GITHUB_PATH"
           clang --version | head -1
+
+      - name: Cache AOSP clang r547379
+        uses: actions/cache@v4
+        with:
+          path: clang-r547379
+          key: aosp-clang-r547379
+
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/apex-ccache
+          key: apex-kernel-ccache-${{ matrix.variant }}-${{ github.sha }}
+          restore-keys: |
+            apex-kernel-ccache-${{ matrix.variant }}-
+            apex-kernel-ccache-
+
+      - name: Enable ccache
+        run: |
+          mkdir -p /tmp/apex-ccache
+          echo "CCACHE_DIR=/tmp/apex-ccache" >> "$GITHUB_ENV"
+          echo "CCACHE_SLOPPINESS=time_macros,pch_defines,include_file_ctime,include_file_mtime" >> "$GITHUB_ENV"
 
       - name: Fetch kernel source
         run: git clone --depth 1 --branch zepharo \

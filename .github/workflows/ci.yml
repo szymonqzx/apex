@@ -160,8 +160,23 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y clang lld llvm \
-            gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu \
+            gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu ccache \
             zip bc bison flex libssl-dev libelf-dev
+
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/apex-ccache
+          key: apex-kernel-ccache-full-${{ github.sha }}
+          restore-keys: |
+            apex-kernel-ccache-full-
+            apex-kernel-ccache-
+
+      - name: Enable ccache
+        run: |
+          mkdir -p /tmp/apex-ccache
+          echo "CCACHE_DIR=/tmp/apex-ccache" >> "$GITHUB_ENV"
+          echo "CCACHE_SLOPPINESS=time_macros,pch_defines,include_file_ctime,include_file_mtime" >> "$GITHUB_ENV"
 
       - name: Fetch Zepharo R9 kernel source
         run: |

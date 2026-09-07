@@ -1,0 +1,62 @@
+name: Bug report
+description: Report a bug in the APEX kernel, ROM overlays, or tooling
+title: "[bug] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Fill in what you can — device-gated issues
+        without device info are hard to reproduce.
+  - type: input
+    id: device
+    attributes:
+      label: Device
+      description: Variant and ROM
+      placeholder: "Redmi Note 12 4G (topaz/tapas), LineageOS 23.2 / Android 16"
+    validations:
+      required: true
+  - type: input
+    id: kernel-version
+    attributes:
+      label: Kernel version
+      description: Output of `/sys/class/apex/version` or the git commit
+      placeholder: "0.4.0-zepharo"
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Also tell us what you expected to happen.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Flash ...
+        2. Run ...
+        3. See ...
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: dmesg / logcat / pstore excerpt (redact anything sensitive)
+      render: shell
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - Kernel (patches/apex-new)
+        - Defconfig
+        - ROM overlay (rom-overlays)
+        - Hiding stack (hiding/)
+        - Tooling (tools/)
+        - Apps (apps/)
+        - CI
+        - Other
+    validations:
+      required: true
