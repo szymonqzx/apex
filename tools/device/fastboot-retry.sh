@@ -19,7 +19,7 @@ set -euo pipefail
 MAX_TRIES=5
 WAIT=5
 FASTBOOT_BIN="${FASTBOOT_BIN:-fastboot}"
-STUCK_KILL_AFTER=60  # seconds; a transfer that long is hung on a bad link
+STUCK_KILL_AFTER="${STUCK_KILL_AFTER:-60}"  # seconds; a transfer this long is hung on a bad link (raise for slow links, e.g. 240)
 
 while [ $# -gt 0 ]; do
   case "$1" in
