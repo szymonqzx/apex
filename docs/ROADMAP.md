@@ -1,8 +1,13 @@
 # APEX Development Roadmap
 
-**Version**: 1.1 — 2026-09-07 (v1.1 adds Phase 1b — the kernel feature bounty)
+**Version**: 1.2 — 2026-09-07 (v1.1 added Phase 1b — kernel feature bounty;
+v1.2 adds Phase 2b — the ROM feature bounty)
 **Branch**: feat/zepharo-rebase
 **Device**: Redmi Note 12 4G (topaz/tapas), SM6225-AD
+**Scope**: **KERNEL + ROM + agent ecosystem** — APEX is a full custom-ROM
+project, not a kernel-only project. Kernel (Phases 0/1/1b) and ROM
+(Phases 2/2b) are co-equal halves of the same product; the agent ecosystem
+(Phase 3) ships inside the ROM.
 **Companion docs**: `BOIL_THE_SEA_PLAN_V2.md` (implementation plan, gap table),
 `TOOLING.md` (ecosystem + build recipe), `DESIGN.md` (architecture),
 `FLASH_SESSION_2026-09-07.md` (device session log), `UPDATE_ARCHITECTURE.md`
@@ -18,14 +23,18 @@ the currency that makes it real.
 1. **Hardware-first**: every phase gates on on-device evidence (boot, logs,
    user-visible function). Static green (compile/tests) is necessary, not
    sufficient.
-2. **Proven-recipe alignment**: the XDA research (2026-09-07,
+2. **Kernel + ROM are one product**: features are scoped to both halves —
+   kernel features (Phase 1b) and ROM features (Phase 2b) are planned,
+   governed, and released together. A kernel feature with no ROM surface
+   (or a ROM feature with no kernel support) is half-done.
+3. **Proven-recipe alignment**: the XDA research (2026-09-07,
    `docs/TOOLING.md` "Kernel ecosystem on XDA") showed every kernel that
    boots this device is built on the ACK/GKI recipe with AOSP prebuilt clang.
    Deviations are only allowed with a documented reason.
-3. **Surgical + verified**: patch series only (never edit `kernel/` in
+4. **Surgical + verified**: patch series only (never edit `kernel/` in
    place), `defconfig/apex_defconfig` as single source of truth, PEV loop on
    every change, CI parity locally (shellcheck/shfmt/pytest).
-4. **GBrain sync**: durable facts/decisions written back per session (Iron
+5. **GBrain sync**: durable facts/decisions written back per session (Iron
    Law), so the roadmap's assumptions stay auditable.
 
 ## State snapshot (verified 2026-09-07)
@@ -325,6 +334,131 @@ overlays, hiding stack, and agent services integrated.
 
 ---
 
+## Phase 2b — ROM feature bounty (the full product)
+
+**Goal**: the ROM half of APEX is as feature-rich as the kernel half. Same
+governance as Phase 1b: each feature = config/overlay-guarded, verify-checked,
+benchmarked or measured, docs/FEATURES.md row, one feature per merge.
+Status legend: **HAVE** (already in `rom-overlays/`/apps/repo), **PORT**
+(from an ecosystem ROM with a source), **NEW** (APEX-original), **RESEARCH**
+(investigate before committing). Every row notes its kernel dependency
+(which Phase 1b kernel feature it needs, if any).
+
+### 1. Base & platform
+
+| Feature | Status | Pri | Effort | Kernel dep | Notes |
+|---|---|---|---|---|---|
+| LOS 23.2 (A16 QPR2) base | HAVE | — | — | — | Chosen base (landscape research) |
+| APEX kernel as ROM requirement | HAVE | — | — | Phase 0/1 | `TARGET_KERNEL_SOURCE/CONFIG` override |
+| docker-lineage-cicd builds | HAVE (tool) | P0 | M | — | G1: containerized, reproducible |
+| SM6225-Android-Playground device tree + vendor blobs | HAVE | — | — | — | LOS 23.2 uses these |
+| Firmware bundle (OS.2.0.204.0.VMGMIXM) | PORT | P1 | S | — | Ship verified firmware in install docs |
+| Reproducible-build manifests (version-sync) | HAVE | — | — | — | `version-sync.sh` pattern |
+
+### 2. UI & device parts
+
+| Feature | Status | Pri | Effort | Kernel dep | Notes |
+|---|---|---|---|---|---|
+| XiaomiParts-style device parts app | PORT | P1 | M | — | dt2w, audio jack, Bluetooth audio, brightness (RisingOS imports it from sdm845-common) |
+| Blur + status-bar overlays | HAVE | — | — | — | LOS changelog: blur, status bar padding, reduce-blur a11y toggle |
+| MiuiCamera | HAVE | — | — | — | LOS 23.2 ships it |
+| FM Radio | RESEARCH | P2 | M | — | topaz has FM hardware; verify HAL/app support (user asked on XDA) |
+| Sensors MultiHAL | HAVE | — | — | — | LOS migrated to Xiaomi Common Sensor MultiHAL |
+| Headset button fix | PORT | P2 | S | — | XDA bug thread 4798775 — wired headset buttons broken on custom ROMs |
+| Audio stutter fix | PORT | P2 | M | — | PixelOS users report stutter on topaz; fix via HAL/policy |
+| NFC stack (topaz) + NFCForge | HAVE | — | — | — | `apps/nfcforge`; NFC is topaz-only |
+
+### 3. Audio & media
+
+| Feature | Status | Pri | Effort | Kernel dep | Notes |
+|---|---|---|---|---|---|
+| Dolby Atmos (SM6225-AD) | PORT | P1 | M | — | org has `android_hardware_dolby`; crDroid ships Dolby on topaz |
+| Dirac sound | PORT | P2 | M | — | Alternative to Dolby |
+| Audio HAL tuning (AGC, speaker gains) | PORT | P2 | M | — | Also covers the PixelOS stutter |
+| MiuiCamera extras (48MP, night) | PORT | P3 | M | — | Blob/config work |
+
+### 4. Performance
+
+| Feature | Status | Pri | Effort | Kernel dep | Notes |
+|---|---|---|---|---|---|
+| ProtonAOSP opts (AxionOS lineage) | PORT | P1 | M | — | Cherry-pickable into LOS |
+| ScrollOptimizer | PORT | P2 | S | — | AxionOS |
+| ART/dex tuning for 4GB | PORT | P2 | M | — | Heap/GC profiles |
+| Lightweight GApps choice (vanilla/microG/nano) | HAVE | — | — | — | LOS vanilla + MindTheGapps + microG option (lineageos4microg) |
+| Boot profile integration (kernel profiles → ROM policy) | NEW | P2 | L | Phase 1b §10 | apex sysfs profiles drive ROM perf modes |
+
+### 5. Privacy & security
+
+| Feature | Status | Pri | Effort | Kernel dep | Notes |
+|---|---|---|---|---|---|
+| Hiding stack in-ROM (SUSFS + LSPosed + TrickyStore) | HAVE | — | — | Phase 1b §8 | `hiding/` + `releases/apex-hiding-stack-1.1.0.zip` |
+| SELinux strict + neverallow audit | HAVE (base) | P1 | M | — | Device + platform policies |
+| Default firewall (nftables userspace) | NEW | P1 | M | Phase 1b §4 (nftables) | AFWall+ or in-ROM policy; per-app rules |
+| Privacy dashboard / permission hardening | PORT | P2 | M | — | AOSP privacy + LOS extras |
+| microG variant | PORT | P2 | L | — | GMS-free APEX edition |
+
+### 6. Agent ecosystem (Phase 3 surface)
+
+| Feature | Status | Pri | Effort | Kernel dep | Notes |
+|---|---|---|---|---|---|
+| ApexControl (cockpit app) | HAVE | — | — | — | 33 Kotlin files, 6 screens |
+| Agent spine (AAOSP port to A16) | HAVE (code) | P1 | L | — | Port LlmManagerService + MCP + consent/audit (D4) |
+| Models (Qwen 1.5B/3B + whisper) | HAVE | — | — | — | `releases/apex-agent-models-1.0.0.zip` |
+| MCP tools (apex-charge, apex-tune) | NEW | P1 | M | Phase 1b §5/§10 | First system tools |
+| Agent memory (FBE-encrypted vector store) | NEW | P2 | L | — | |
+
+### 7. Desktop & Lindroid
+
+| Feature | Status | Pri | Effort | Kernel dep | Notes |
+|---|---|---|---|---|---|
+| Desktop mode (scrcpy) | HAVE | — | — | — | scrcpy-server v4.1 packaged |
+| APEX WM (vxwm) | HAVE (code) | P2 | L | — | Device validation = G13 |
+| Lindroid | HAVE (code) | P3 | L | — | Device validation = G13 |
+| Arch chroot bridge | HAVE | — | — | — | `apex-bridge.c`, apex-term.sh |
+
+### 8. Updates & OTA
+
+| Feature | Status | Pri | Effort | Kernel dep | Notes |
+|---|---|---|---|---|---|
+| OTA (Updater / Evolution-X/OTA) | PORT | P1 | M | — | Phase 2.5 |
+| Virtual A/B vs OTA decision (D3) | OPEN | P0 | — | — | `UPDATE_ARCHITECTURE.md` |
+| Dirty-flash spec | HAVE | — | — | — | `DIRTY_FLASH_UPGRADE_SPEC.md` |
+| AVB-clean builds (avbroot) | PORT | P2 | M | — | Locked-bootloader users |
+| Incremental/ab-ota packages | RESEARCH | P3 | L | — | payload-dumper-go reference |
+
+### 9. APEX first-party apps
+
+| Feature | Status | Pri | Effort | Notes |
+|---|---|---|---|---|
+| apex-control (cockpit) | HAVE | — | — | Also: charge/thermal/power dashboard UI (NEW, P1) |
+| nfcforge | HAVE | — | — | topaz NFC |
+| ptk-tui | HAVE | — | — | |
+| lineage-hider (Xposed) | HAVE | — | — | Hiding stack |
+| Updater app (ROM-branded) | PORT | P2 | M | |
+
+### 10. Novel APEX ROM features (differentiators)
+
+| Feature | Status | Pri | Effort | Kernel dep | Notes |
+|---|---|---|---|---|---|
+| Power dashboard app (charge+thermal+battery) | NEW | P1 | M | Phase 1b §5 sysfs | UI over `/sys/class/apex/power/*` |
+| Feature-flag app (runtime kernel toggles) | NEW | P1 | M | Phase 1b §10 sysfs | Companion to kernel feature toggles |
+| Boot-profile UI (per-mode kernel profiles) | NEW | P2 | L | Phase 1b §10 | Performance/Battery/Balanced |
+| Hiding-stack installer (one-tap) | HAVE | — | — | — | `configure_hiding.sh` → app |
+| Agent-in-ROM deep links (ApexControl ↔ MCP) | NEW | P2 | M | — | |
+
+### Phase 2b acceptance
+
+- P0/P1 ROM features shipped in the first APEX ROM build with
+  docs/FEATURES.md rows
+- Every ROM feature has a verify.sh check (build-time) and, where possible,
+  an on-device cert test
+- Kernel↔ROM dependency pairs (nftables↔firewall, apex sysfs↔dashboard app,
+  feature toggles↔flag app) are tracked together in FEATURES.md — neither
+  half ships alone
+- 7-day soak on the full ROM; dirty-flash + clean-flash both pass
+
+---
+
 ## Phase 3 — Agent + desktop ecosystem (differentiators)
 
 **Goal**: on-device AI agent + desktop environments, per the approved design
@@ -398,18 +532,20 @@ overlays, hiding stack, and agent services integrated.
 ## Critical path
 
 ```
-Phase 0 (boot) ──► Phase 1 (stabilize) ──► Phase 1b (feature bounty)
+Phase 0 (boot) ──► Phase 1 (stabilize) ──► Phase 1b (kernel bounty)
         │                │                        │
-        │                └──► Phase 2 (ROM) ◄─────┘   (bounty P1 features
-        │                                              land before ROM freeze)
-        └──► Phase 3 (agent) ──► Phase 4 (release)
+        │                └──► Phase 2 (ROM) ──► Phase 2b (ROM bounty) ◄──┘
+        │                        │                        │
+        │                        └──► Phase 3 (agent) ────┘
+        │                                │
+        └──► Phase 4 (release) ◄──────────┘
 ```
 
 Phase 3's app-side work can begin before Phase 1 completes (static dev +
 emulator), but device validation needs a booting kernel. Phase 4 gates on
-Phase 1 + 1b (stability and the feature set are the release currency). Phase 2
-freezes on the Phase 1b P1 feature set so the ROM ships the bounty, not a
-moving target.
+Phases 1 + 1b + 2b (stability and the kernel+ROM feature set are the release
+currency). Phase 2 freezes on the Phase 1b P1 set; Phase 2b ships the ROM
+bounty on top — kernel↔ROM feature pairs land together.
 
 ## Decisions needed (open, owner: user)
 
@@ -423,7 +559,10 @@ moving target.
 | D6 | Zip module default after on-device evidence | Phase 1.1 | APEX_NO_MODULES=1 if dlkm works |
 | D7 | Helios coordination scope | Phase 4.4 | tester + patch exchange |
 | D8 | Lockdown LSM policy (force-enable vs permissive) | Phase 1b §7 | permissive until ROM lands |
-| D9 | Feature-bounty scope for v1.0 (which P2/P3 rows ship) | Phase 1b | P0/P1 mandatory; P2 on evidence |
+| D9 | Kernel-bounty scope for v1.0 (which P2/P3 rows ship) | Phase 1b | P0/P1 mandatory; P2 on evidence |
+| D10 | ROM-bounty scope for v1.0 (which P2/P3 rows ship) | Phase 2b | P0/P1 mandatory; P2 on evidence |
+| D11 | FM Radio: pursue or drop (HAL/app support check) | Phase 2b §2 | drop if HAL unsupported |
+| D12 | Dolby vs Dirac vs neither | Phase 2b §3 | Dolby (org has android_hardware_dolby) |
 
 ## References
 
