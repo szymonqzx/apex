@@ -137,6 +137,58 @@ blob/config/bring-up reference for the real LOS build (Phase 2).
 4. **drgn** — add to the device toolchain for pstore/vmcore analysis once the
    kernel boots.
 
+## Kernel ecosystem on XDA — build recipe & device quirks (2026-09-07)
+
+Deep research via the xda-scraper tool (threads, RSS, GitHub cross-checks);
+full detail in GBrain `apex-xda-research-2026-09-07`.
+
+### Who builds what for this device, and how
+
+| Kernel | Base | Config | Toolchain | Modules | Status |
+|---|---|---|---|---|---|
+| **Ecstasy** (ROM default: LOS 23.2 + PixelOS 17) | ACK android13-5.15-lts fork (5.15.202) | GKI + `vendor/bengal_GKI.config` fragment | AOSP prebuilt | GKI dlkm partitions (system/vendor) | Boots, de-facto standard |
+| **YASK / YASK-NEXT** (HyperOS 3 EU port) | ACK android13-5.15-lts OR CLO `kernel.lnx.5.15.r1-rel` | `gki_defconfig` | AOSP clang r547379 | none shipped | Boots (TNF builder, weekly CI) |
+| **Helios** (new, Sep 2026, KSU-Next + SusFS) | ACK android13-5.15 | `helios_defconfig` (chickernel-derived) | AOSP clang r522817 | **CONFIG_MODULES off** | Seeking testers |
+| **ChicKernel** (reference, thread closed) | ACK android13-5.15-lts fork | chickernel/ksun/ksun_susfs | latest clang, -O3+polly / thinLTO | — | GitHub active |
+| **APEX** | TNF zepharo branch (CLO, 5.15.211) | `apex_defconfig` (custom) | distro clang → **AOSP r547379 (now auto)** | 491 .ko in zip (flag-gated) | **logo hang — bisecting** |
+
+Key finding: every kernel that boots on this device uses the **AOSP GKI build
+system + gki_defconfig (or GKI base + vendor fragment) + AOSP prebuilt clang**.
+TNF's proven YASK releases do NOT build from the `zepharo` branch (experimental:
+ACK+CLO merges + BBRv3/Schedhorizon/f2fs DIO; last commit 2026-08-08).
+
+### Device P0 quirks (ChicKernel README, reused by Helios)
+
+1. sm5602 fuel gauge + dwc3 USB break after **5.15.149** — root cause is the
+   upstream `of: property` typo-fix (`io-channels` vs `io-channel`): the
+   vendor DTB uses the singular form. **Already native in the Zepharo CLO
+   base** (`io-channel` in `drivers/of/property.c`) — verified.
+2. USB tethering panic — upstream dwc3 gadget soft-reset regression.
+   **Already native in the Zepharo base** (`dwc3_gadget_soft_connect` has no
+   soft reset; `dwc3_core_soft_reset` is static) — verified.
+3. mi_thermald low-battery hotplug targets the E-cores → **ported as
+   `apex-thermald-cores`** (redirects to P-cores, ChicKernel 3e85c42).
+4. Vendor module kmsg spam → **ported as `apex-vendor-kmsg`**
+   (CONFIG_SUPPRESS_VENDOR_MODULE_DEBUGGING, ChicKernel 06af5ac8).
+
+### Module strategy
+
+Proven kernels ship **no modules** (ROM provides vendor dlkm; GKI 2.0 keeps
+vendor modules in system_dlkm/vendor_dlkm/vendor_ramdisk). APEX's 491-module
+236MB zip is the outlier. `APEX_NO_MODULES=1` produces the lean ~45MB zip;
+default unchanged until on-device module compatibility is proven. Module
+signature policy already matches gki_defconfig (MODULES=y, SIG=y,
+SIG_PROTECT=y); CONFIG_MODVERSIONS=y preserves the GKI KMI for vendor modules.
+
+### DTB strategy (Ecstasy reference)
+
+Ecstasy carries **device-dumped DTBs** (6 Khaje/SM6225 dtbdump variants) and
+patches them with `fixup-dtbs.sh`: adds `qcom,force-warm-reboot` and
+relocates ramoops 5D000000 → 9ff00000. When repacking a boot image, keep the
+device's own DTB (flash-boot.sh path does this by construction); the failed
+APEX boots had empty pstore at 5D000000 — verify ramoops placement in the
+DTB of every flash image.
+
 ## Gap analysis — what our toolset adds
 
 Nothing in the ecosystem provides the **flash → boot-verify → rollback loop**
