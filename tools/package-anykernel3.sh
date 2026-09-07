@@ -33,12 +33,14 @@ cp -r "$AK3/tools" "$ZIP_DIR/"
 cp -r "$AK3/META-INF" "$ZIP_DIR/"
 cp "$AK3/anykernel.sh" "$ZIP_DIR/"
 cp "$AK3/README.md" "$ZIP_DIR/" 2>/dev/null || true
+cp "$AK3/LICENSE" "$ZIP_DIR/" 2>/dev/null || true
 
-# 3. Copy kernel image
+# 3. Copy kernel image as Image.ksu (R9-proven AK3 naming: the anykernel.sh
+# "Only KernelSU version found" branch renames it to Image and flashes)
 IMAGE="$OUT/arch/arm64/boot/Image"
 if [ -f "$IMAGE" ]; then
-  cp "$IMAGE" "$ZIP_DIR/zImage"
-  echo "  [OK] zImage copied ($(du -h "$IMAGE" | cut -f1))"
+  cp "$IMAGE" "$ZIP_DIR/Image.ksu"
+  echo "  [OK] Image.ksu copied ($(du -h "$IMAGE" | cut -f1))"
 else
   echo "  [FAIL] kernel Image not found: $IMAGE"
   exit 1
@@ -200,7 +202,7 @@ echo ""
 echo "=== Package created: $APEX/$ZIP_NAME ==="
 echo "  Size: $(du -h "$APEX/$ZIP_NAME" | cut -f1)"
 echo "  Contents:"
-echo "    - zImage (kernel Image, 5.15.211 Zepharo branch)"
+echo "    - Image.ksu (kernel Image, 5.15.211 Zepharo branch)"
 [ -f "$ZIP_DIR/dtbo.img" ] && echo "    - dtbo.img"
 if [ "$NO_MODULES" = "1" ]; then
   echo "    - no modules (ROM vendor dlkm provides them)"

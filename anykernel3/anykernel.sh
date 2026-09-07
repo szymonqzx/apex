@@ -1,13 +1,10 @@
 ### AnyKernel3 Ramdisk Mod Script
 ## osm0sis @ xda-developers
-## APEX kernel — proper AK3 layout (2026-09-08 rebuild)
-## Mirrors the proven TNF R9 AK3 structure: modern properties(), relative
-## ak3-core.sh source, init_boot-aware boot install, no modules shipped.
 
 ### AnyKernel setup
 # global properties
 properties() { '
-kernel.string=APEX kernel 0.4 for Redmi Note 12 4G (topaz/tapas) — Zepharo 5.15.211 base
+kernel.string=APEX kernel 0.4 for topaz (Zepharo R9 base)
 do.devicecheck=1
 do.modules=0
 do.systemless=0
@@ -15,11 +12,15 @@ do.cleanup=1
 do.cleanuponabort=0
 device.name1=topaz
 device.name2=tapas
-device.name3=gemstones
+device.name3=sapphiren
+device.name4=sapphire
+device.name5=xun
+device.name6=creek
 supported.versions=13-16
 supported.patchlevels=
 supported.vendorpatchlevels=
 '; } # end properties
+
 
 ### AnyKernel install
 ## boot shell variables
@@ -29,41 +30,70 @@ ramdisk_compression=auto
 patch_vbmeta_flag=auto
 no_magisk_check=1
 
-# import functions/variables and setup patching — see for reference (DO NOT REMOVE)
+# import functions/variables and setup patching - see for reference (DO NOT REMOVE)
 . tools/ak3-core.sh
 
-# --- Brick-safety: back up the original boot image before touching anything ---
-# Only reads the boot partition; never writes to bootloader/aboot/xbl/tz/rpm/
-# modem or partition tables.
-backup_original_boot() {
-  local BACKUP_DIR="/data/adb/apex/backup"
-  local BACKUP_FILE="boot-backup-$(date +%Y%m%d-%H%M%S).img"
-  local count
-  if [ -d /data/adb ]; then
-    mkdir -p "$BACKUP_DIR" 2>/dev/null || return 0
-    dd if="$BLOCK" of="$BACKUP_DIR/$BACKUP_FILE" bs=1048576 2>/dev/null
-    if [ $? -eq 0 ]; then
-      count=$(ls -t "$BACKUP_DIR"/boot-backup-*.img 2>/dev/null | tail -n +4 | wc -l)
-      [ "$count" -gt 0 ] && ls -t "$BACKUP_DIR"/boot-backup-*.img 2>/dev/null | tail -n +4 | xargs rm -f 2>/dev/null
-      ui_print "- Original boot backed up to $BACKUP_DIR/$BACKUP_FILE"
-    else
-      ui_print "- WARNING: boot backup failed, continuing"
-    fi
-  fi
+# Kernel selection function
+choose_kernel() {
+  ui_print " "
+  ui_print "Kernel Version Selection:"
+  ui_print " "
+  ui_print "  VOL + : non-KSU"
+  ui_print "  VOL - : KSU"
+  ui_print " "
+  ui_print "Waiting for input... "
+  ui_print " "
+  ui_print " "
+
+  while true; do
+    input=$(getevent -qlc 1 2>/dev/null | grep -E "KEY_VOLUME(UP|DOWN)")
+    case "$input" in
+      *KEY_VOLUMEUP*)
+        return 1
+        ;;
+      *KEY_VOLUMEDOWN*)
+        return 2
+        ;;
+    esac
+    sleep 0.1
+  done
 }
 
-backup_original_boot
+# Handle kernel selection
+if [ -f "$AKHOME/Image.ksu" ] && [ -f "$AKHOME/Image.noksu" ]; then
+  choose_kernel
+  case $? in
+    1)
+      ui_print " "
+      ui_print "Selected: non-KSU Kernel"
+      mv -f "$AKHOME/Image.noksu" "$AKHOME/Image"
+      ;;
+    2)
+      ui_print " "
+      ui_print "Selected: KSU Kernel"
+      mv -f "$AKHOME/Image.ksu" "$AKHOME/Image"
+      ;;
+  esac
+elif [ -f "$AKHOME/Image" ]; then
+  ui_print " "
+  ui_print "Single image kernel found, flashing it"
+  mv -f "$AKHOME/Image.ksu" "$AKHOME/Image"
+elif [ -f "$AKHOME/Image.ksu" ]; then
+  ui_print " "
+  ui_print "Only KernelSU version found, flashing it"
+  mv -f "$AKHOME/Image.ksu" "$AKHOME/Image"
+elif [ -f "$AKHOME/Image.noksu" ]; then
+  ui_print " "
+  ui_print "Only Standard version found, flashing it"
+  mv -f "$AKHOME/Image.noksu" "$AKHOME/Image"
+fi
 
-# --- Boot install (GKI 2.0 aware) ---
-# topaz has a separate init_boot (ramdisk lives there, boot is kernel-only):
-# with init_boot present we split the current boot and flash_boot (writes
-# boot without touching init_boot's ramdisk); otherwise dump_boot + write_boot.
+# boot install
 if [ -L "/dev/block/bootdevice/by-name/init_boot_a" -o -L "/dev/block/by-name/init_boot_a" ]; then
-  ui_print "- init_boot device detected, flashing boot only"
-  split_boot
-  flash_boot
+    split_boot # for devices with init_boot ramdisk
+    flash_boot # for devices with init_boot ramdisk
 else
-  dump_boot
-  write_boot
+    dump_boot # use split_boot to skip ramdisk unpack, e.g. for devices with init_boot ramdisk
+    write_boot # use flash_boot to skip ramdisk repack, e.g. for devices with init_boot ramdisk
 fi
 ## end boot install
