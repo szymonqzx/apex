@@ -59,9 +59,8 @@ for S in $TARGETS; do
     || { echo "ERROR: flash boot_$S failed" >&2; exit 1; }
 
   # Verify the written slot content matches the local image.
-  # (dd over adb needs root; fall back to a fastboot re-read when possible.)
+  # (dd over adb needs root; without it, the flash's OKAY is the check.)
   VERIFIED=0
-  DUMP=$("$HERE/fastboot-retry.sh" --max-tries 3 -- getvar "partition-size:boot_$S" 2>/dev/null | grep -oE "0x[0-9a-f]+" | head -1 || true)
   if adb devices 2>/dev/null | grep -q "device$" && "$HERE/adb-retry.sh" -- "su -c 'id -u'" 2>/dev/null | grep -q "^0$"; then
     SHA=$("$HERE/adb-retry.sh" -- "su -c 'dd if=/dev/block/by-name/boot_$S bs=1M 2>/dev/null | sha256sum'" 2>/dev/null | awk '{print $1}' || true)
     if [ "$SHA" = "$LOCAL_SHA" ]; then

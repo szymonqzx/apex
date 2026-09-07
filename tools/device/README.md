@@ -57,9 +57,27 @@ tools/device/bisect-kernel.sh tools/device/stages-apex.txt --boot-ref <ref-boot>
 
 ## State notes (2026-09-07)
 
-- Device: topaz, bootloader UNLOCKED, slot b = Ecstasy (working), slot a
-  holds a KNOWN-NON-BOOTING APEX kernel — re-flash before any slot-a trial.
-- The APEX kernel (5.15.211) hangs at the Xiaomi logo; plain Zepharo
-  variant built and ready for a persistent trial (`new-boot-plain.img` in
-  `backups/device-2026-09-07/`).
-- Full post-mortem: `docs/FLASH_SESSION_2026-09-07.md`.
+- Device: topaz, bootloader UNLOCKED, slot b = Ecstasy (working).
+- The APEX kernel (5.15.211, custom apex_defconfig + distro clang) hangs at
+  the Xiaomi logo. The 2026-09-07 investigation found the device-tested
+  kernels (Zepharo R9, ChicKernel) are built with **AOSP clang r547379 +
+  gki_defconfig** — see `docs/TOOLING.md` and `docs/FLASH_SESSION_2026-09-07.md`.
+- An R9-recipe reproduction kernel is built and packaged:
+  `out-r9/arch/arm64/boot/Image` → `backups/device-2026-09-07/new-boot-r9.img`.
+  Flash it (slot a) to confirm the recipe boots; then use
+  `stages-gki.txt` to re-add APEX features on that base.
+
+## Known toolset pitfalls (fixed 2026-09-07)
+
+- `fastboot-retry.sh` had a `out=$(cmd) &` bug — the ASSIGNMENT was
+  backgrounded, so under `set -u` every attempt aborted instantly with
+  "unbound variable" and the real fastboot call never ran. Fixed: output
+  streams to temp files. If a transfer "hangs", raise `STUCK_KILL_AFTER`
+  (default 60; slow links ~240) — and check the wrapper actually invokes
+  fastboot before blaming the link.
+
+## Toolchain
+
+`fetch-toolchain.sh` downloads the device-tested AOSP clang (r547379) and
+magiskboot for the laptop. Use it before any kernel build that will be
+flashed to a device.

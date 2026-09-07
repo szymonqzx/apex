@@ -109,7 +109,9 @@ while IFS='|' read -r name features; do
   if ! bash "$HERE/flash-boot.sh" "$BOOT_IMG" --activate; then
     FAILED+=("$name:flash"); break
   fi
-  if bash "$HERE/boot-test.sh" --expect "$EXPECT" $([ "$EXPECT_APEX" -eq 1 ] && echo --expect-apex) --timeout 240; then
+  TEST_ARGS=(--expect "$EXPECT" --timeout 240)
+  [ "$EXPECT_APEX" -eq 1 ] && TEST_ARGS+=(--expect-apex)
+  if bash "$HERE/boot-test.sh" "${TEST_ARGS[@]}"; then
     echo "== [bisect] '$name' BOOTS ✓"
     PASSED+=("$name")
     report "{\"stage\":\"$name\",\"result\":\"pass\",\"features\":\"$CURRENT_FEATURES\"}"

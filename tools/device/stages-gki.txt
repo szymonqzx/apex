@@ -1,0 +1,16 @@
+# Bisection stages for the APEX boot-hang — GKI base variant.
+#
+# The 2026-09-07 investigation showed the device-tested kernels (Zepharo R9
+# et al.) are built from gki_defconfig with AOSP clang r547379 — NOT from a
+# custom 6224-option defconfig with distro clang. Run the bisection against
+# that known-good base first:
+#
+#   tools/device/bisect-kernel.sh tools/device/stages-gki.txt \
+#       --base-defconfig <gki_defconfig path> --boot-ref <reference boot>
+#
+# Each stage adds one APEX feature on top of the GKI base.
+gki-base | KEEP
+ksu | CONFIG_KSU
+susfs | CONFIG_KSU_SUSFS
+baseband-guard | CONFIG_BBG
+thermal | CONFIG_APEX_THERMAL
