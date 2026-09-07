@@ -40,20 +40,22 @@ jobs:
             binutils-aarch64-linux-gnu ccache zip bc bison flex libssl-dev \
             libelf-dev aria2
 
-      - name: Fetch AOSP clang r547379 (the device-tested toolchain)
-        run: |
-          aria2c -x 16 -s 16 -o clang-r547379.tar.gz \
-            "https://github.com/topnotchfreaks/clang/releases/download/v1.0.0/clang-r547379.tar.gz"
-          mkdir -p clang-r547379
-          tar -xzf clang-r547379.tar.gz -C clang-r547379
-          echo "$PWD/clang-r547379/bin" >> "$GITHUB_PATH"
-          clang --version | head -1
-
       - name: Cache AOSP clang r547379
         uses: actions/cache@v4
         with:
           path: clang-r547379
           key: aosp-clang-r547379
+
+      - name: Fetch AOSP clang r547379 (skipped when cache hits)
+        run: |
+          if [ ! -x clang-r547379/bin/clang ]; then
+            aria2c -x 16 -s 16 -o clang-r547379.tar.gz \
+              "https://github.com/topnotchfreaks/clang/releases/download/v1.0.0/clang-r547379.tar.gz"
+            mkdir -p clang-r547379
+            tar -xzf clang-r547379.tar.gz -C clang-r547379
+          fi
+          echo "$PWD/clang-r547379/bin" >> "$GITHUB_PATH"
+          clang --version | head -1
 
       - name: Cache ccache
         uses: actions/cache@v4
