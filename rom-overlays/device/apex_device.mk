@@ -127,6 +127,17 @@ PRODUCT_COPY_FILES += \
     vendor/apex/rom-overlays/init.d/apex_power.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/apex_power.rc \
     vendor/apex/rom-overlays/init.d/apex_profiles.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/apex_profiles.rc
 
+# ── Zero-maintenance: thermal learner + crash safe-mode ───────────
+# Thermal learner adjusts APEX trips by up to +/-2C from 7-day history.
+# Safe-mode disables the KSU module stack after a watchdog/panic reboot.
+
+PRODUCT_COPY_FILES += \
+    vendor/apex/rom-overlays/init.d/apex_thermal_learner.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/apex_thermal_learner.rc \
+    vendor/apex/rom-overlays/init.d/apex_thermal_learner.sh:$(TARGET_COPY_OUT_VENDOR)/bin/apex_thermal_learner.sh \
+    vendor/apex/rom-overlays/init.d/apex_safe_mode.rc:$(TARGET_COPY_OUT_SYSTEM)/etc/init/apex_safe_mode.rc \
+    vendor/apex/rom-overlays/init.d/apex_safe_mode.sh:$(TARGET_COPY_OUT_SYSTEM)/bin/apex_safe_mode.sh \
+    vendor/apex/rom-overlays/init.d/apex_safe_mode_clear.sh:$(TARGET_COPY_OUT_SYSTEM)/bin/apex_safe_mode_clear.sh
+
 # ── SELinux policies ──────────────────────────────────────────────
 
 PRODUCT_SEPOLICY += \

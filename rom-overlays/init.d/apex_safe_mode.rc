@@ -1,0 +1,13 @@
+# apex_safe_mode.rc — installed at /system/etc/init/apex_safe_mode.rc
+#
+# Crash recovery gate: after a PMIC-watchdog / kernel-panic reboot, disable
+# the KSU module stack so the device boots to a known-good state.
+#
+# Runs at post-fs-data (before zygote) and again at boot completion.
+# Brick-safety: read-only over partitions; only /data is touched.
+
+on post-fs-data
+    exec - root root -- /system/bin/apex_safe_mode.sh
+
+on property:sys.boot_completed=1
+    exec - root root -- /system/bin/apex_safe_mode.sh

@@ -18,7 +18,8 @@
 #define APEX_VERSION "0.4.0-zepharo"
 #define APEX_BASE "5.15.170 Zepharo R9"
 
-static struct kobject *apex_kobj;
+struct kobject *apex_kobj;
+EXPORT_SYMBOL_GPL(apex_kobj);
 
 static ssize_t version_show(struct kobject *kobj, struct kobj_attribute *attr,
 			    char *buf)
@@ -36,7 +37,11 @@ static ssize_t enabled_features_show(struct kobject *kobj,
 				     struct kobj_attribute *attr, char *buf)
 {
 	/* Features registered under /sys/class/apex/ */
+#ifdef CONFIG_APEX_THERMAL
+	return sprintf(buf, "sysfs charge thermal\n");
+#else
 	return sprintf(buf, "sysfs charge\n");
+#endif
 }
 
 static struct kobj_attribute version_attr = __ATTR_RO(version);

@@ -1,0 +1,18 @@
+# apex_thermal_learner.rc — installed at /vendor/etc/init/apex_thermal_learner.rc
+#
+# 7-day thermal learner: adjusts the APEX thermal trips by up to +/-2C based
+# on the rolling average from /proc/apex/thermal_history.
+#
+# The service adjusts at boot, then re-checks hourly (internal loop).
+# Disable with: setprop persist.apex.thermal_learner 0
+#
+# Requires the APEX kernel with CONFIG_APEX_THERMAL.
+
+service apex_thermal_learner /vendor/bin/apex_thermal_learner.sh
+    class main
+    user root
+    group root
+    disabled
+
+on property:sys.boot_completed=1
+    start apex_thermal_learner

@@ -27,3 +27,10 @@ apex-root          KernelSU-Next + SUSFS (path/mount/kstat/maps hiding)
 
 # 7. Base-tree fixes (upstream bugs that break -Werror builds)
 apex-base-fixes     Fix base-tree defects (minidump_log md_align_offset type, ...)
+
+# 8. Thermal learner — history ring buffer + tunable trips
+#    MUST run after apex-sysfs (uses the exported apex_kobj)
+apex-thermal        Thermal history ring buffer (/proc/apex/thermal_history) + sysfs trips
+
+# 9. PMIC watchdog — bind the PON WDT driver on pm8150/pm6125-family PMICs
+apex-wdt            Enable PMIC WDT (hard-reset on hang) + safe-mode boot basis
