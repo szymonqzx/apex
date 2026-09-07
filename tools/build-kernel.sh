@@ -105,6 +105,16 @@ if [ -n "${NEUTRON_CLANG:-}" ] && [ -d "${NEUTRON_CLANG}/bin" ]; then
   echo "  Using Neutron Clang: ${NEUTRON_CLANG}/bin"
 fi
 
+# AOSP prebuilt clang r547379 — the proven device recipe (see docs/TOOLING.md:
+# Ecstasy/YASK/Helios all build with AOSP prebuilt clang, not distro clang).
+# Auto-used when fetched by tools/device/fetch-toolchain.sh (default
+# $HOME/.apex-toolchain). An explicit NEUTRON_CLANG still wins; falls back to
+# the distro clang otherwise.
+if [ -z "${NEUTRON_CLANG:-}" ] && [ -x "${APEX_TOOLCHAIN:-$HOME/.apex-toolchain}/bin/clang" ]; then
+  export PATH="${APEX_TOOLCHAIN:-$HOME/.apex-toolchain}/bin:$PATH"
+  echo "  Using AOSP clang r547379: ${APEX_TOOLCHAIN:-$HOME/.apex-toolchain}/bin"
+fi
+
 echo "=== APEX kernel build v$APEX_VERSION ==="
 echo "  defconfig: $DEFCONFIG"
 echo "  jobs:      $JOBS"
