@@ -22,9 +22,11 @@ NO_MODULES="${APEX_NO_MODULES:-0}"
 echo "=== Packaging AnyKernel3 zip v${VERSION} ==="
 echo "  modules:  $([ "$NO_MODULES" = "1" ] && echo "NONE (APEX_NO_MODULES=1, ROM dlkm)" || echo "shipped ($(find "$OUT" -name '*.ko' 2>/dev/null | wc -l) .ko)")"
 
-# 1. Prepare build directory
+# 1. Prepare build directory (modules/ only when modules are shipped —
+# an empty modules/ dir is NOT valid AK3 and confuses recovery installers)
 rm -rf "$ZIP_DIR"
-mkdir -p "$ZIP_DIR/modules"
+mkdir -p "$ZIP_DIR"
+[ "$NO_MODULES" = "1" ] || mkdir -p "$ZIP_DIR/modules"
 
 # 2. Copy AnyKernel3 template (core engine + META-INF + anykernel.sh)
 cp -r "$AK3/tools" "$ZIP_DIR/"
@@ -193,7 +195,7 @@ fi
 
 # 6. Create the zip
 cd "$ZIP_DIR"
-zip -r9 "$APEX/$ZIP_NAME" . -x "*.DS_Store" >/dev/null 2>&1
+zip -r9 -X "$APEX/$ZIP_NAME" . -x "*.DS_Store" >/dev/null 2>&1
 echo ""
 echo "=== Package created: $APEX/$ZIP_NAME ==="
 echo "  Size: $(du -h "$APEX/$ZIP_NAME" | cut -f1)"
