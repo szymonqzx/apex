@@ -1,0 +1,76 @@
+name: APEX Kernel Matrix Build
+
+# Builds every APEX kernel variant (the bisection stages as CI) so a
+# feature-toggle regression never reaches a device. Inspired by
+# WildKernels/GKI_KernelSU_SUSFS feature-set matrices (see docs/TOOLING.md).
+#
+# Variants mirror tools/device/stages-apex.txt:
+#   plain  — Zepharo base, all APEX features off
+#   ksu    — + KernelSU-Next
+#   susfs  — + SUSFS hiding
+#   bbg    — + Baseband Guard LSM
+#   thermal— + thermal learner
+#   full   — canonical apex_defconfig (everything)
+#
+# CI cannot catch a device boot hang — that is what tools/device/bisect-
+# kernel.sh is for on hardware — but it guarantees every variant COMPILES.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, feat/zepharo-rebase]
+    paths: ['defconfig/**', 'patches/**', 'kernel/**', 'tools/build-kernel.sh', 'tools/apply-patches.sh']
+
+jobs:
+  matrix-build:
+    name: ${{ matrix.variant }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [plain, ksu, susfs, bbg, thermal, full]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld llvm gcc-aarch64-linux-gnu \
+            binutils-aarch64-linux-gnu zip bc bison flex libssl-dev libelf-dev
+
+      - name: Fetch kernel source
+        run: git clone --depth 1 --branch zepharo \
+              https://github.com/topnotchfreaks/kernel_msm-5.15 kernel
+
+      - name: Apply APEX patches
+        run: bash tools/apply-patches.sh
+
+      - name: Prepare variant defconfig
+        run: |
+          cp defconfig/apex_defconfig /tmp/variant_defconfig
+          case "${{ matrix.variant }}" in
+            plain)   sed -i -E 's/^CONFIG_(KSU|KSU_SUSFS|BBG|APEX_THERMAL)(_|=).*/# CONFIG_\1 is not set/' /tmp/variant_defconfig ;;
+            ksu)     sed -i -E 's/^CONFIG_(KSU_SUSFS|BBG|APEX_THERMAL)(_|=).*/# CONFIG_\1 is not set/' /tmp/variant_defconfig ;;
+            susfs)   sed -i -E 's/^CONFIG_(BBG|APEX_THERMAL)(_|=).*/# CONFIG_\1 is not set/' /tmp/variant_defconfig ;;
+            bbg)     sed -i -E 's/^CONFIG_APEX_THERMAL(=.*)?/# CONFIG_APEX_THERMAL is not set/' /tmp/variant_defconfig ;;
+            full)    : ;;
+          esac
+          cp /tmp/variant_defconfig defconfig/apex_defconfig
+
+      - name: Build kernel
+        run: bash tools/build-kernel.sh
+
+      - name: Verify build output
+        run: bash tools/verify.sh
+
+      - name: Package AnyKernel3 zip
+        run: bash tools/package-anykernel3.sh
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: apex-kernel-${{ matrix.variant }}
+          path: |
+            apex-kernel-*.zip
+          retention-days: 14
