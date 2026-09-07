@@ -55,16 +55,16 @@ fun TerminalScreen(viewModel: TerminalViewModel = viewModel()) {
                             Icon(Icons.Default.Close, contentDescription = "Ctrl+C")
                         }
                         IconButton(onClick = { viewModel.sendCtrlZ() }) {
-                            Icon(Icons.Default.Pause, contentDescription = "Ctrl+Z")
+                            Icon(Icons.Default.PlayArrow, contentDescription = "Ctrl+Z")
                         }
                         IconButton(onClick = { viewModel.clear() }) {
                             Icon(Icons.Default.Clear, contentDescription = "Clear")
                         }
                         IconButton(onClick = { showResizeDialog = true }) {
-                            Icon(Icons.Default.AspectRatio, contentDescription = "Resize")
+                            Icon(Icons.Default.Settings, contentDescription = "Resize")
                         }
                         IconButton(onClick = { viewModel.disconnect() }) {
-                            Icon(Icons.Default.PowerSettingsNew, contentDescription = "Disconnect")
+                            Icon(Icons.Default.ExitToApp, contentDescription = "Disconnect")
                         }
                     } else {
                         IconButton(onClick = { viewModel.connect() }) {

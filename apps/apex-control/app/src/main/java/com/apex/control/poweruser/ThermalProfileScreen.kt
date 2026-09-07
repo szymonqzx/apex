@@ -10,7 +10,7 @@
  *   - Thermal zone listing
  *
  * Reads from:
- *   /sys/class/thermal/thermal_zone*/temp
+ *   /sys/class/thermal/thermal_zone/temp
  *   /proc/apex/thermal_profile (if APEX kernel module loaded)
  *   /vendor/etc/thermald.conf
  */

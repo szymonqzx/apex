@@ -1,0 +1,6 @@
+id=apex_rom
+name=APEX ROM Agent Spine
+version=v1.0.0
+versionCode=1
+author=takon
+description=APEX ROM agent-spine: system services, ApexControl, NFCForge, PTK TUI, init scripts, SELinux policy, and build.prop overlays for Redmi Note 12 4G (topaz/tapas). Requires KernelSU-Next. Does NOT flash kernel or boot image — kernel is flashed separately via AnyKernel3.

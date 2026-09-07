@@ -1,0 +1,37 @@
+# apex_reboot.rc — installed at /vendor/etc/init/apex_reboot.rc
+# Advanced reboot options: recovery, bootloader, soft reboot, restart systemui.
+#
+# Inspired by crDroid advanced reboot. Triggered via system properties
+# set by Apex Control or the power menu.
+#
+# Properties:
+#   apex.reboot=recovery     → reboot to recovery
+#   apex.reboot=bootloader   → reboot to bootloader (fastboot)
+#   apex.reboot=soft         → soft reboot (restart zygote, not full reboot)
+#   apex.reboot=systemui     → restart SystemUI only
+#   apex.reboot=safe         → reboot to safe mode
+
+# Recovery reboot
+on property:apex.reboot=recovery
+    setprop sys.powerctl recovery
+
+# Bootloader reboot
+on property:apex.reboot=bootloader
+    setprop sys.powerctl bootloader
+
+# Safe mode reboot
+on property:apex.reboot=safe
+    setprop persist.sys.safemode 1
+    setprop sys.powerctl reboot
+
+# Soft reboot (restart zygote/system_server without full reboot)
+on property:apex.reboot=soft
+    setprop ctl.restart zygote
+
+# SystemUI restart only
+on property:apex.reboot=systemui
+    setprop ctl.restart com.android.systemui
+
+# Clear the trigger after action (prevents reboot loop on boot)
+on property:apex.reboot=done
+    setprop apex.reboot ""

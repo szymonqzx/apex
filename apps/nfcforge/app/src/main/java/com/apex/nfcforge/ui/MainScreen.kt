@@ -71,7 +71,7 @@ fun MainScreen(viewModel: NfcViewModel = viewModel()) {
                             NfcViewModel.ConnectionState.DISCONNECTED,
                             NfcViewModel.ConnectionState.ERROR -> {
                                 Button(onClick = { viewModel.connect() }) {
-                                    Icon(Icons.Default.Link, contentDescription = null)
+                                    Icon(Icons.Default.Create, contentDescription = null)
                                     Spacer(Modifier.width(4.dp))
                                     Text("Connect")
                                 }
@@ -85,7 +85,7 @@ fun MainScreen(viewModel: NfcViewModel = viewModel()) {
                                     onClick = { viewModel.disconnect() },
                                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                                 ) {
-                                    Icon(Icons.Default.LinkOff, contentDescription = null)
+                                    Icon(Icons.Default.Close, contentDescription = null)
                                     Spacer(Modifier.width(4.dp))
                                     Text("Disconnect")
                                 }

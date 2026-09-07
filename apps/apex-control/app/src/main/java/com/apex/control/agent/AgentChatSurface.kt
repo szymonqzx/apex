@@ -237,13 +237,6 @@ private fun ConsentCard(
   onApprove: () -> Unit,
   onDeny: () -> Unit,
 ) {
-  // Countdown timer
-  LaunchedEffect(countdown) {
-    if (countdown > 0) {
-      kotlinx.coroutines.delay(1000)
-      consentCountdown = countdown - 1
-    }
-  }
   var currentCountdown by remember { mutableStateOf(countdown) }
   LaunchedEffect(countdown) {
     currentCountdown = countdown
@@ -345,9 +338,4 @@ private fun ChatMessageBubble(msg: ChatMessage) {
   }
 }
 
-// ── Chat message data class ────────────────────────────────────────
-
-data class ChatMessage(
-  val text: String,
-  val isUser: Boolean,
-)
+// ChatMessage is defined in AgentViewModel.kt

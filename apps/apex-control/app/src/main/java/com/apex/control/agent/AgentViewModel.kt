@@ -53,8 +53,8 @@ class AgentViewModel : ViewModel() {
 
   // ── Debug log ───────────────────────────────────────────────────
 
-  private val _debugLog = MutableStateFlow("")
-  val debugLog: StateFlow<String> = _debugLog.asStateFlow()
+  private val _debugLog = MutableStateFlow<List<DebugLogEntry>>(emptyList())
+  val debugLog: StateFlow<List<DebugLogEntry>> = _debugLog.asStateFlow()
 
   // ── Agent status ────────────────────────────────────────────────
 
@@ -63,8 +63,8 @@ class AgentViewModel : ViewModel() {
 
   // ── Consent ─────────────────────────────────────────────────────
 
-  private val _pendingConsent = MutableStateFlow<ConsentRequest?>(null)
-  val pendingConsent: StateFlow<ConsentRequest?> = _pendingConsent.asStateFlow()
+  private val _pendingConsent = MutableStateFlow<ChatState.ConsentRequested?>(null)
+  val pendingConsent: StateFlow<ChatState.ConsentRequested?> = _pendingConsent.asStateFlow()
 
   private var agentRepository: AgentRepository? = null
 
@@ -87,28 +87,34 @@ class AgentViewModel : ViewModel() {
     if (prompt.isBlank()) return
 
     _chatState.value = ChatState.Processing
-    _chatHistory.value = _chatHistory.value + ChatMessage.user(prompt)
+    _chatHistory.value = _chatHistory.value + ChatMessage(prompt, isUser = true)
 
     viewModelScope.launch {
       try {
-        val response = withContext(Dispatchers.IO) {
-          agentRepository?.chat(prompt) ?: "[error] Agent not connected"
+        val state = withContext(Dispatchers.IO) {
+          agentRepository?.sendChat(prompt) ?: ChatState.Error("Agent not connected")
         }
 
-        // Check if response contains a consent request
-        if (response.startsWith("[consent]")) {
-          _chatState.value = ChatState.ConsentPending(
-              toolName = response.substringAfter("[consent] ").substringBefore(" "),
-              description = response.substringAfter("description=").substringBefore(";"),
-              action = response.substringAfter("action=").substringBefore(";")
-          )
-        } else {
-          _chatHistory.value = _chatHistory.value + ChatMessage.assistant(response)
-          _chatState.value = ChatState.Idle
+        when (state) {
+          is ChatState.ConsentRequested -> {
+            _chatState.value = state
+            _pendingConsent.value = state
+          }
+          is ChatState.Response -> {
+            _chatHistory.value = _chatHistory.value + ChatMessage(state.text, isUser = false)
+            _chatState.value = ChatState.Idle
+          }
+          is ChatState.Error -> {
+            _chatHistory.value = _chatHistory.value + ChatMessage(state.message, isUser = false)
+            _chatState.value = ChatState.Idle
+          }
+          else -> {
+            _chatState.value = ChatState.Idle
+          }
         }
       } catch (e: Exception) {
         Log.e(TAG, "Chat failed: ${e.message}")
-        _chatHistory.value = _chatHistory.value + ChatMessage.error(e.message ?: "Unknown error")
+        _chatHistory.value = _chatHistory.value + ChatMessage(e.message ?: "Unknown error", isUser = false)
         _chatState.value = ChatState.Idle
       }
     }
@@ -119,10 +125,10 @@ class AgentViewModel : ViewModel() {
    */
   fun approveConsent() {
     val state = _chatState.value
-    if (state is ChatState.ConsentPending) {
+    if (state is ChatState.ConsentRequested) {
       viewModelScope.launch {
         withContext(Dispatchers.IO) {
-          agentRepository?.approveConsent(state.toolName, state.action)
+          agentRepository?.approveConsent(state.toolName)
         }
         _pendingConsent.value = null
         _chatState.value = ChatState.Processing
@@ -135,28 +141,15 @@ class AgentViewModel : ViewModel() {
    */
   fun denyConsent() {
     val state = _chatState.value
-    if (state is ChatState.ConsentPending) {
+    if (state is ChatState.ConsentRequested) {
       viewModelScope.launch {
         withContext(Dispatchers.IO) {
-          agentRepository?.denyConsent(state.toolName, state.action)
+          agentRepository?.denyConsent(state.toolName)
         }
         _pendingConsent.value = null
-        _chatHistory.value = _chatHistory.value + ChatMessage.assistant("[denied] Tool call denied by user.")
+        _chatHistory.value = _chatHistory.value + ChatMessage("[denied] Tool call denied by user.", isUser = false)
         _chatState.value = ChatState.Idle
       }
-    }
-  }
-
-  /**
-   * Switch the model tier. Valid: "nano", "small", "medium", "remote".
-   */
-  fun setModelTier(tier: String) {
-    viewModelScope.launch {
-      withContext(Dispatchers.IO) {
-        agentRepository?.setModelTier(tier)
-      }
-      _currentTier.value = tier
-      refreshStatus()
     }
   }
 
@@ -165,10 +158,11 @@ class AgentViewModel : ViewModel() {
    */
   fun downloadModel(modelId: String) {
     viewModelScope.launch {
-      withContext(Dispatchers.IO) {
-        agentRepository?.downloadModel(modelId) { progress ->
-          _modelDownloadProgress.value = _modelDownloadProgress.value + (modelId to progress)
-        }
+      val progress = withContext(Dispatchers.IO) {
+        agentRepository?.downloadModel(modelId)
+      }
+      if (progress != null) {
+        _modelDownloadProgress.value = _modelDownloadProgress.value + (modelId to progress.percent / 100f)
       }
       _modelDownloadProgress.value = _modelDownloadProgress.value - modelId
       refreshModels()
@@ -181,7 +175,7 @@ class AgentViewModel : ViewModel() {
   fun refreshStatus() {
     viewModelScope.launch {
       val status = withContext(Dispatchers.IO) {
-        agentRepository?.getStatus()
+        agentRepository?.getAgentStatus()
       }
       _agentStatus.value = status
     }
@@ -216,10 +210,10 @@ class AgentViewModel : ViewModel() {
    */
   fun refreshDebugLog() {
     viewModelScope.launch {
-      val log = withContext(Dispatchers.IO) {
-        agentRepository?.getDebugLog() ?: ""
+      val entries = withContext(Dispatchers.IO) {
+        agentRepository?.getDebugLog() ?: emptyList()
       }
-      _debugLog.value = log
+      _debugLog.value = entries
     }
   }
 
@@ -233,7 +227,7 @@ class AgentViewModel : ViewModel() {
 
   override fun onCleared() {
     super.onCleared()
-    agentRepository?.unbind()
+    // AgentRepository uses a BridgeClient; no explicit unbind needed
   }
 }
 
@@ -244,22 +238,20 @@ data class ChatMessage(
     val content: String,
     val timestamp: Long = System.currentTimeMillis()
 ) {
+  val isUser: Boolean get() = role == "user"
+  val text: String get() = content
+
+  constructor(text: String, isUser: Boolean) : this(
+    role = if (isUser) "user" else "assistant",
+    content = text,
+  )
+
   companion object {
     fun user(text: String) = ChatMessage("user", text)
     fun assistant(text: String) = ChatMessage("assistant", text)
     fun error(text: String) = ChatMessage("error", text)
   }
 }
-
-data class AgentStatus(
-    val daemonAlive: Boolean,
-    val fallbackMode: Boolean,
-    val currentTier: String,
-    val modelLoaded: Boolean,
-    val throughputTokPerSec: String,
-    val memoryUsageMb: Int,
-    val kernelDetected: Boolean
-)
 
 data class ConsentRequest(
     val toolName: String,

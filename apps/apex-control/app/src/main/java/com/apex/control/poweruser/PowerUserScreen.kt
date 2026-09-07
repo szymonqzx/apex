@@ -83,7 +83,7 @@ fun PowerUserScreen(
         // === Pocket Detection ===
         FeatureCard(
             title = "Pocket Detection",
-            icon = Icons.Default.Pocket,
+            icon = Icons.Default.Smartphone,
         ) {
             SwitchRow(
                 label = "Pocket detection",

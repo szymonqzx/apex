@@ -31,16 +31,31 @@ ERRORS=0
 # Scan all text files for dangerous patterns
 # Skip: .git, build artifacts, this script itself, docs (docs describe the rules, not execute them)
 while IFS= read -r file; do
+  # Skip anything larger than 2MB up front — no shell script or patch
+  # carrying a dangerous write pattern is that big, and grepping huge
+  # binaries (zips, GGUF models, jars) is both slow and pointless.
+  size=$(stat -c%s "$file" 2>/dev/null || echo 0)
+  if [ "$size" -gt 2097152 ]; then
+    continue
+  fi
+
   # Skip binary files
   if file "$file" 2>/dev/null | grep -q "binary"; then
     continue
   fi
 
-  # Skip this script itself and test files (tests contain assertion
-  # pattern strings for their own checks, not actual commands)
+  # Skip this script itself, test files (tests contain assertion
+  # pattern strings for their own checks, not actual commands), docs
+  # (docs describe the rules, not execute them), and other verify-*
+  # scripts that contain the same grep patterns for their own checks.
   case "$file" in
     */verify-brick-safety.sh) continue ;;
     */tests/*) continue ;;
+    */docs/*) continue ;;
+    */verify-rom.sh) continue ;;
+    */verify.sh) continue ;;
+    */verify-stealth.sh) continue ;;
+    */verify-daily-driver.sh) continue ;;
   esac
 
   # Check for dd writes to dangerous partitions
@@ -79,6 +94,7 @@ done < <(find "$REPO_ROOT" -type f \
   -not -path "*/.git/*" \
   -not -path "*/out/*" \
   -not -path "*/build/*" \
+  -not -path "*/.gradle/*" \
   -not -path "*/__pycache__/*" \
   -not -path "*/node_modules/*" \
   -not -path "*/kernel/*" \

@@ -1,0 +1,46 @@
+# apex_power_user.rc — installed at /vendor/etc/init/apex_power_user.rc
+# Miscellaneous power-user features: sensor block per-app, pocket detection
+# integration, USB config toggle, app downgrade allowance, and developer
+# quick-toggles.
+#
+# Inspired by crDroid miscellaneous features. These are property-driven
+# toggles that Apex Control can set without requiring a reboot.
+#
+# Properties (set by Apex Control):
+#   persist.apex.sensor_block=1        — block sensors for non-foreground apps
+#   persist.apex.allow_downgrade=1     — allow app downgrade installs
+#   persist.apex.netflix_spoof=0       — Netflix HDR spoof (device-specific)
+#   persist.apex.gps_force_mode=1      — force GPS mode (high accuracy)
+#   persist.apex.disable_haptics=0     — disable system haptic feedback
+
+# === Boot: apply persisted power-user settings ===
+on property:sys.boot_completed=1
+    # Sensor block for non-foreground apps
+    write /sys/kernel/apex_sensors/block_non_fg ${persist.apex.sensor_block:-0}
+    # Allow app downgrade
+    setprop persist.pm.allow_app_downgrade ${persist.apex.allow_downgrade:-0}
+
+# === Sensor block toggle ===
+on property:persist.apex.sensor_block=1
+    write /sys/kernel/apex_sensors/block_non_fg 1
+on property:persist.apex.sensor_block=0
+    write /sys/kernel/apex_sensors/block_non_fg 0
+
+# === App downgrade toggle ===
+on property:persist.apex.allow_downgrade=1
+    setprop persist.pm.allow_app_downgrade 1
+on property:persist.apex.allow_downgrade=0
+    setprop persist.pm.allow_app_downgrade 0
+
+# === Disable haptics ===
+on property:persist.apex.disable_haptics=1
+    write /sys/class/leds/vibrator/duration 0
+    setprop persist.sys.haptic_feedback 0
+on property:persist.apex.disable_haptics=0
+    setprop persist.sys.haptic_feedback 1
+
+# === Force GPS high-accuracy mode ===
+on property:persist.apex.gps_force_mode=1
+    setprop persist.sys.gps.mode high_accuracy
+on property:persist.apex.gps_force_mode=0
+    setprop persist.sys.gps.mode default

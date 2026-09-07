@@ -55,28 +55,41 @@ echo "  [INFO] $MODULE_COUNT modules copied"
 # This is critical — without modules.dep, the init system cannot resolve
 # module dependencies and loading order.
 if [ "$MODULE_COUNT" -gt 0 ]; then
-  echo "  [INFO] Running depmod for module dependency metadata..."
-  # Use the kernel version from the build
+  echo "  [INFO] Generating depmod metadata..."
+
+  # Use the kernel version from the built Image
   KVER=$(strings "$OUT/arch/arm64/boot/Image" 2>/dev/null | \
     grep -oP 'Linux version \K[0-9]+\.[0-9]+\.[0-9]+' | head -1)
   if [ -z "$KVER" ]; then
-    # Fallback: extract from module filenames
-    KVER=$(basename "$(find "$OUT" -name "*.ko" | head -1)" .ko | \
-      grep -oP '\.\K[0-9]+\.[0-9]+\.[0-9]+.*$' || echo "5.15.170")
+    KVER="5.15.211"
   fi
 
-  # Run depmod against the staged modules directory
-  # -b sets the root directory for the module path
-  # -e checks for unresolved symbols
-  depmod -b "$ZIP_DIR/modules" "$KVER" 2>/dev/null || true
+  # depmod expects modules at <root>/lib/modules/<kver>/
+  # Create that structure in a temporary root, run depmod, then copy results
+  DEPMOD_ROOT=$(mktemp -d)
+  MOD_DEST="$DEPMOD_ROOT/lib/modules/$KVER"
+  mkdir -p "$MOD_DEST"
 
-  # If depmod failed (e.g. wrong kver), try a simpler approach
-  if [ ! -f "$ZIP_DIR/modules/modules.dep" ]; then
-    (cd "$ZIP_DIR/modules" && depmod --all 2>/dev/null) || true
-  fi
+  # Copy all .ko files and modules.builtin into the depmod root
+  for ko in "$ZIP_DIR"/modules/*.ko; do
+    [ -f "$ko" ] && cp "$ko" "$MOD_DEST/"
+  done
+  [ -f "$OUT/modules.builtin" ] && cp "$OUT/modules.builtin" "$MOD_DEST/"
+
+  # Run depmod with the correct root and kernel version
+  depmod -b "$DEPMOD_ROOT" "$KVER" 2>/dev/null || true
+
+  # Copy generated metadata into the zip staging area
+  for meta in modules.dep modules.alias modules.symbols modules.builtin modules.softdep; do
+    if [ -f "$MOD_DEST/$meta" ]; then
+      cp "$MOD_DEST/$meta" "$ZIP_DIR/modules/"
+    fi
+  done
+
+  rm -rf "$DEPMOD_ROOT"
 
   if [ -f "$ZIP_DIR/modules/modules.dep" ]; then
-    echo "  [OK] modules.dep generated"
+    echo "  [OK] modules.dep generated for kernel $KVER"
   else
     echo "  [WARN] depmod did not produce modules.dep — modprobe may not work"
   fi

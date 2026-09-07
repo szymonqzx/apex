@@ -1,0 +1,69 @@
+# apex_profiles.rc — installed at /vendor/etc/init/apex_profiles.rc
+# Profile switching for the APEX kernel (Redmi Note 12 4G, SM6225-AD)
+#
+# Switching: setprop apex.profile battery|balanced|performance
+#
+# Tuned for the shipped v0.4 kernel:
+#   - default governor: schedhorizon (EAS-compatible schedutil fork)
+#   - WALT load tracking (sysctls under /proc/sys/kernel/sched_*)
+#   - Adreno 610 GPU (stock ceiling 1260 MHz)
+#   - Charge limiting via standard power_supply property on the bq2589x
+#     "bbc" supply: /sys/class/power_supply/bbc/charge_control_end_threshold
+#
+# The dead /proc/apex/* and /proc/apex_charge/* surfaces from older plans
+# are GONE — do not write them.
+
+# === Battery profile ===
+# Slow to climb, quick to fall back; bursts stay on the A53 cluster;
+# GPU capped ~85% of stock; charge limit 80%.
+on property:apex.profile=battery
+    # CPU governor (schedhorizon): conservative ramp on big cluster
+    write /sys/devices/system/cpu/cpufreq/policy0/schedhorizon/up_rate_limit_us 30000
+    write /sys/devices/system/cpu/cpufreq/policy0/schedhorizon/down_rate_limit_us 5000
+    write /sys/devices/system/cpu/cpufreq/policy4/schedhorizon/up_rate_limit_us 40000
+    write /sys/devices/system/cpu/cpufreq/policy4/schedhorizon/down_rate_limit_us 5000
+    # WALT: raise upmigrate threshold so small bursts stay on A53
+    write /proc/sys/kernel/sched_upmigrate 95
+    write /proc/sys/kernel/sched_downmigrate 80
+    # GPU: cap max clock ~85% of stock (1260 MHz -> ~1071 MHz)
+    write /sys/class/kgsl/kgsl-3d0/max_gpuclk 1071000000
+    write /sys/class/kgsl/kgsl-3d0/devfreq/max_freq 1071000000
+    # Charge limit: 80% for battery health
+    write /sys/class/power_supply/bbc/charge_control_end_threshold 80
+    setprop sys.apex.profile.active battery
+
+# === Balanced profile (default) ===
+# Vendor-like ramp, stock GPU, 90% charge limit.
+on property:apex.profile=balanced
+    # CPU: moderate ramp, faster-down
+    write /sys/devices/system/cpu/cpufreq/policy0/schedhorizon/up_rate_limit_us 10000
+    write /sys/devices/system/cpu/cpufreq/policy0/schedhorizon/down_rate_limit_us 8000
+    write /sys/devices/system/cpu/cpufreq/policy4/schedhorizon/up_rate_limit_us 10000
+    write /sys/devices/system/cpu/cpufreq/policy4/schedhorizon/down_rate_limit_us 8000
+    # WALT: stock upmigrate/downmigrate
+    write /proc/sys/kernel/sched_upmigrate 90
+    write /proc/sys/kernel/sched_downmigrate 75
+    # GPU: stock clock
+    write /sys/class/kgsl/kgsl-3d0/max_gpuclk 1260000000
+    write /sys/class/kgsl/kgsl-3d0/devfreq/max_freq 1260000000
+    # Charge limit: 90%
+    write /sys/class/power_supply/bbc/charge_control_end_threshold 90
+    setprop sys.apex.profile.active balanced
+
+# === Performance profile ===
+# Fast ramp, stock GPU, no charge limit.
+on property:apex.profile=performance
+    # CPU: quick to climb
+    write /sys/devices/system/cpu/cpufreq/policy0/schedhorizon/up_rate_limit_us 5000
+    write /sys/devices/system/cpu/cpufreq/policy0/schedhorizon/down_rate_limit_us 10000
+    write /sys/devices/system/cpu/cpufreq/policy4/schedhorizon/up_rate_limit_us 5000
+    write /sys/devices/system/cpu/cpufreq/policy4/schedhorizon/down_rate_limit_us 10000
+    # WALT: lower upmigrate threshold so big cluster engages sooner
+    write /proc/sys/kernel/sched_upmigrate 85
+    write /proc/sys/kernel/sched_downmigrate 70
+    # GPU: stock ceiling (no cap)
+    write /sys/class/kgsl/kgsl-3d0/max_gpuclk 1260000000
+    write /sys/class/kgsl/kgsl-3d0/devfreq/max_freq 1260000000
+    # Charge limit: disabled
+    write /sys/class/power_supply/bbc/charge_control_end_threshold 0
+    setprop sys.apex.profile.active performance

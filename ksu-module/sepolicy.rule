@@ -1,0 +1,74 @@
+# APEX ROM SELinux policy rules for KernelSU-Next
+#
+# These rules are loaded by KSU's sepolicy.rule mechanism.
+# Enforcing mode only — no permissive domains.
+
+# ── Agent domain ──────────────────────────────────────────────────
+
+# apex_agent domain — the apexagentd system service
+type apex_agent, domain;
+type apex_agent_exec, file_type, exec_type;
+
+# Allow init to transition to apex_agent domain
+init_daemon_domain(apex_agent)
+
+# Allow apex_agent to create and bind its socket
+allow apex_agent apex_agent:tcp_socket { create bind listen accept read write };
+allow apex_agent apex_agent:unix_stream_socket { create bind listen accept read write };
+allow apex_agent socket_device:dir { search add_name write };
+allow apex_agent socket_device:sock_file { create setattr unlink };
+
+# Allow apex_agent to communicate with system_server via Binder
+binder_call(apex_agent, system_server)
+binder_call(system_server, apex_agent)
+allow apex_agent apex_agent:binder { call transfer };
+
+# Allow apex_agent to read/write procfs nodes for kernel modules
+allow apex_agent apex_charge_proc:file { read write open getattr };
+allow apex_agent apex_charge_proc:dir { search read };
+
+# Allow apex_agent to read system properties
+allow apex_agent prop_file:file { read open getattr };
+
+# ── Charge Manager procfs ─────────────────────────────────────────
+
+type apex_charge_proc, file_type, fs_type;
+
+allow init apex_charge_proc:file { read write open getattr setattr };
+allow init apex_charge_proc:dir { search read write add_name remove_name };
+
+allow system_app apex_charge_proc:file { read write open getattr };
+allow system_app apex_charge_proc:dir { search read };
+
+allow apex_agent apex_charge_proc:file { read write open getattr };
+allow apex_agent apex_charge_proc:dir { search read };
+
+# ── Chroot domain (Lindroid) ──────────────────────────────────────
+
+type apex_chroot, domain;
+type apex_chroot_exec, file_type, exec_type;
+
+# Allow init to start the chroot bridge daemon
+init_daemon_domain(apex_chroot)
+
+# Allow apex_chroot to access Binder for system_server communication
+binder_call(apex_chroot, system_server)
+binder_call(system_server, apex_chroot)
+
+# Allow apex_chroot to read/write hardware device nodes
+allow apex_chroot apex_chroot:chr_file { read write open ioctl getattr };
+
+# Allow apex_chroot to read battery/charge status
+allow apex_chroot apex_charge_proc:file { read open getattr };
+allow apex_chroot apex_charge_proc:dir { search read };
+
+# ── Window Manager ────────────────────────────────────────────────
+
+# Allow system_app to set freeform window management properties
+allow system_app freeform_window_prop:property_service { set };
+
+# ── Pocket detection ──────────────────────────────────────────────
+
+# Allow pocket_detect service to read proximity sensor
+allow apex_agent sysfs_sensors:file { read open getattr };
+allow apex_agent sysfs_sensors:dir { search read };

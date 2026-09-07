@@ -1,0 +1,34 @@
+# apex_smart_charging.rc — installed at /vendor/etc/init/apex_smart_charging.rc
+# Smart charging schedule: time-based charge limit to preserve battery health.
+#
+# Inspired by crDroid smart charging. The user sets a charge window
+# (e.g., charge to 80% overnight, top to 100% 30min before wake).
+#
+# Properties (set by Apex Control):
+#   persist.apex.smart_charge=1          — enable smart charging
+#   persist.apex.charge_limit=80         — target charge percent
+#   persist.apex.top_up_time=0630        — time to top up to 100% (HHMM)
+#   persist.apex.wake_time=0700          — user wake time (HHMM)
+#
+# The actual scheduling is done by apex_smart_charge.sh (companion script).
+# This RC file starts the service and handles property triggers.
+
+# Start smart charging scheduler on boot
+on property:sys.boot_completed=1
+    start apex_smart_charge
+
+# Enable/disable smart charging
+on property:persist.apex.smart_charge=1
+    start apex_smart_charge
+
+on property:persist.apex.smart_charge=0
+    stop apex_smart_charge
+    # Reset charge limit to none
+    setprop apex.charge_limit 0
+
+# Service definition
+service apex_smart_charge /vendor/bin/apex_smart_charge.sh
+    class main
+    user system
+    group system
+    disabled

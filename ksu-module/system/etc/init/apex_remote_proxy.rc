@@ -1,0 +1,24 @@
+# apex_remote_proxy.rc — init service for the remote model proxy.
+# Runs as a separate process from apexagentd, in its own SELinux domain.
+#
+# The proxy listens on localhost:9879 and forwards chat completion
+# requests to the configured OmniRoute endpoint.
+#
+# Configuration via system properties:
+#   persist.sys.apex.remote_endpoint — OmniRoute API URL
+#   persist.sys.apex.remote_model    — Model name to use
+
+service apex_remote_proxy /system/bin/apex_remote_proxy
+    class main
+    user system
+    group system
+    seclabel u:r:apex_remote_proxy:s0
+    disabled
+    oneshot
+
+# Start proxy only when remote model is enabled
+on property:persist.sys.apex.remote_enabled=1
+    start apex_remote_proxy
+
+on property:persist.sys.apex.remote_enabled=0
+    stop apex_remote_proxy

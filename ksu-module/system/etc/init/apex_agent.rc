@@ -1,0 +1,39 @@
+# apex_agent.rc — Init RC for apexagentd service
+#
+# The agent daemon runs as a core system service. It is critical (restarted
+# on crash) but killable under OOM (oom_score_adj tuned high so LMKD can
+# reclaim it without taking down system_server).
+#
+# Part of the APEX ROM agent-spine architecture.
+
+service apexagentd /system/bin/apexagentd
+  class core
+  user system
+  group system
+  socket apex-agent stream 0660 system system
+  capabilities NET_BIND_SERVICE
+  oom_score_adj 900
+  critical
+  onrestart restart apex-agent-socket
+  onrestart write /proc/sys/vm/drop_caches 1
+  seclabel u:r:apex_agent:s0
+
+# Socket directory for apex-agent
+on init
+  mkdir /dev/socket/apex-agent 0750 system system
+
+on boot
+  # Start apexagentd after system_server is ready
+  wait_for_prop sys.boot_completed 1
+  start apexagentd
+
+on property:sys.boot_completed=1
+  start apexagentd
+
+# Restart apexagentd if it crashes (up to 5 times in 10 minutes)
+on property:init.svc.apexagentd=stopped
+  trigger apex-agent-restart
+
+on apex-agent-restart
+  # Only restart if boot is completed and we haven't exceeded retry limit
+  exec - system system -- /system/bin/apex_agent_healthcheck.sh

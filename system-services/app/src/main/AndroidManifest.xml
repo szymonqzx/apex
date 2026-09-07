@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ApexSystemServices — system-privileged APK containing:
+    - LlmManagerService (agent binder service)
+    - ApexWindowManager (freeform window management)
+    - DesktopModeService (scrcpy-based desktop mode)
+    - LindroidManager (Linux container manager)
+
+  Installed to /system/priv-app/ via KSU module overlay.
+  Runs with system UID (1000) via android:sharedUserId="android.uid.system".
+  Hidden API access granted by KSU (disabled hidden-api-blocklist).
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.apex.services"
+    android:sharedUserId="android.uid.system"
+    android:versionCode="1"
+    android:versionName="1.0.0">
+
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.MANAGE_ACTIVITY_TASKS" />
+    <uses-permission android:name="android.permission.INTERNAL_SYSTEM_WINDOW" />
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" />
+    <uses-permission android:name="android.permission.DUMP" />
+    <uses-permission android:name="android.permission.INTERACT_ACROSS_USERS_FULL" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.BIND_DEVICE_ADMIN" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <application
+        android:label="APEX System Services"
+        android:directBootAware="true"
+        android:allowBackup="false"
+        android:persistent="true">
+
+        <receiver
+            android:name=".BootReceiver"
+            android:enabled="true"
+            android:exported="false"
+            android:directBootAware="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+    </application>
+</manifest>

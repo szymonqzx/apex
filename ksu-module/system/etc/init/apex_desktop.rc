@@ -1,0 +1,17 @@
+# apex_desktop.rc — init script for APEX Desktop Mode.
+# DesktopModeService runs inside system_server, so no separate service.
+# This RC sets properties for scrcpy configuration.
+
+on property:sys.boot_completed=1
+    # Default scrcpy configuration
+    setprop persist.sys.apex.scrcpy_port 27183
+    setprop persist.sys.apex.scrcpy_max_size 1920
+    setprop persist.sys.apex.scrcpy_max_fps 60
+    setprop persist.sys.apex.scrcpy_bitrate 8000000
+
+# Trigger desktop mode via property (alternative to binder call)
+on property:apex.desktop.start=1
+    setprop apex.desktop.state starting
+
+on property:apex.desktop.start=0
+    setprop apex.desktop.state stopping

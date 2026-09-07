@@ -1,0 +1,16 @@
+# APEX overlay — append to /vendor/build.prop (dirty apply)
+# Target ROM: LineageOS 23.2-20260328-UNOFFICIAL-tapas (Android 16)
+# Device: Redmi Note 12 4G (topaz/tapas, SM6225-AD)
+
+# --- Vendor security patch (must match system build.prop) ---
+ro.vendor.build.security_patch=2024-12-01
+ro.vendor.build.tags=release-keys
+
+# --- Vendor build fingerprint (must match system) ---
+ro.vendor.build.fingerprint=Xiaomi/topaz_global/topaz:13/TKQ1.221114.001/V816.0.7.0.UMGMIXM:user/release-keys
+
+# --- DTB info (stock value, prevents mismatch detection) ---
+ro.boot.dtbinfo=0x0000000000000000(0x0000000000000000)/0x0000000000000000
+
+# --- APEX vendor-side ---
+ro.vendor.apex.version=1.2.0

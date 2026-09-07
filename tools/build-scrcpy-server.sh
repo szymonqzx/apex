@@ -22,7 +22,24 @@ OUTPUT_DIR="${2:-$PROJECT_ROOT/desktop}"
 SCRCPY_VERSION="v4.1"
 SCRCPY_REPO="https://github.com/Genymobile/scrcpy.git"
 
+# Pre-built server URL (faster than building from source)
+PREBUILT_URL="https://github.com/Genymobile/scrcpy/releases/download/v4.1/scrcpy-server-v4.1"
+
 echo "Building scrcpy server ${SCRCPY_VERSION}..."
+
+# Option 1: Use pre-built server (recommended — no NDK/Gradle needed)
+if [ "${USE_PREBUILT:-1}" = "1" ]; then
+    echo "Downloading pre-built scrcpy server..."
+    mkdir -p "$OUTPUT_DIR/prebuilt"
+    curl -fsSL -o "$OUTPUT_DIR/prebuilt/scrcpy-server.jar" "$PREBUILT_URL"
+    echo ""
+    echo "scrcpy server downloaded: $OUTPUT_DIR/prebuilt/scrcpy-server.jar"
+    echo "Size: $(du -h "$OUTPUT_DIR/prebuilt/scrcpy-server.jar" | cut -f1)"
+    exit 0
+fi
+
+# Option 2: Build from source (requires Android SDK + Gradle)
+echo "Building from source (USE_PREBUILT=0)..."
 
 # Clone if not present
 if [ ! -d "$SCRCPY_SRC" ]; then

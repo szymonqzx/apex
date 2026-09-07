@@ -68,7 +68,7 @@ jobs:
             bash -n tools/package-anykernel3.sh
             bash -n tools/apply-patches.sh
             bash -n tools/release.sh
-            bash -n tools/verify.sh
+            bash -n tools/verify.sh tools/package-ksu-module.sh tools/package-flashable.sh tools/verify-rom.sh
             bash -n anykernel3/anykernel.sh
           fi
 
@@ -407,4 +407,75 @@ jobs:
             bash tools/verify-brick-safety.sh
           else
             echo "verify-brick-safety.sh not found — skipping"
+          fi
+
+  rom-build-verification:
+    name: ROM Build Verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify KSU module structure
+        run: |
+          # Check required KSU module files
+          for f in module.prop post-fs-data.sh service.sh sepolicy.rule; do
+            if [ ! -f "ksu-module/$f" ]; then
+              echo "ERROR: ksu-module/$f not found"
+              exit 1
+            fi
+            echo "  OK: ksu-module/$f"
+          done
+
+          # Check APKs are present in module
+          for apk in ksu-module/system/priv-app/ApexSystemServices/ApexSystemServices.apk \
+                     ksu-module/system/priv-app/ApexControl/ApexControl.apk \
+                     ksu-module/system/app/NFCForge/NFCForge.apk \
+                     ksu-module/system/app/PTKTUI/PTKTUI.apk; do
+            if [ ! -f "$apk" ]; then
+              echo "ERROR: $apk not found"
+              exit 1
+            fi
+            echo "  OK: $apk"
+          done
+
+          # Check init RC files
+          RC_COUNT=$(find ksu-module/system/etc/init -name "*.rc" 2>/dev/null | wc -l)
+          if [ "$RC_COUNT" -lt 17 ]; then
+            echo "ERROR: Only $RC_COUNT init RC files (expected 17+)"
+            exit 1
+          fi
+          echo "  OK: $RC_COUNT init RC files"
+
+          # Check shell scripts
+          SCRIPT_COUNT=$(find ksu-module/system/bin -name "*.sh" 2>/dev/null | wc -l)
+          if [ "$SCRIPT_COUNT" -lt 8 ]; then
+            echo "ERROR: Only $SCRIPT_COUNT shell scripts (expected 8+)"
+            exit 1
+          fi
+          echo "  OK: $SCRIPT_COUNT shell scripts"
+
+      - name: Shellcheck ROM scripts
+        run: |
+          if command -v shellcheck >/dev/null 2>&1; then
+            shellcheck -x tools/package-ksu-module.sh tools/package-flashable.sh \
+              tools/verify-rom.sh ksu-module/post-fs-data.sh \
+              ksu-module/service.sh ksu-module/uninstall.sh \
+              ksu-module/system/bin/*.sh || true
+          else
+            echo "shellcheck not installed — running bash -n only"
+            for f in tools/package-ksu-module.sh tools/package-flashable.sh \
+                     tools/verify-rom.sh ksu-module/post-fs-data.sh \
+                     ksu-module/service.sh ksu-module/uninstall.sh \
+                     ksu-module/system/bin/*.sh; do
+              bash -n "$f"
+            done
+          fi
+
+      - name: Run ROM build verification
+        run: |
+          if [ -f tools/verify-rom.sh ]; then
+            bash tools/verify-rom.sh
+          else
+            echo "ERROR: verify-rom.sh not found"
+            exit 1
           fi

@@ -1,0 +1,123 @@
+# apex_power.rc — installed at /vendor/etc/init/apex_power.rc
+# Target: LineageOS 23.2 (Android 16) on Redmi Note 12 4G (topaz/tapas)
+# Wires screen state, gaming mode, and hardening to the kernel apex state machine.
+#
+# Android 16 init notes:
+# - lowmemorykiller module sysfs path removed in 5.15+ kernels with custom LMK.
+#   APEX LMK is configured via /proc/apex_lmk/ sysfs interface (module params).
+# - cpufreq governor paths use /sys/devices/system/cpu/cpu*/cpufreq/ (unchanged).
+# - thermal zone paths use /sys/class/thermal/thermal_zone*/ (unchanged).
+# - devfreq GPU path: /sys/class/kgsl/kgsl-3d0/devfreq/ (Qualcomm Adreno).
+# - apex-cpuboost: /sys/kernel/apex_cpu_boost/ (auto-loaded, no init needed).
+# - apex-thermal-uclamp: /sys/kernel/apex_thermal_uclamp/ (auto-loaded).
+# - apex-blx: /sys/class/apex_blx/ (auto-loaded).
+
+# === Early init: kernel hardening ===
+on early-init
+    write /proc/sys/kernel/kptr_restrict 2
+    write /proc/sys/kernel/dmesg_restrict 1
+    write /proc/sys/kernel/perf_event_paranoid 3
+
+# === APEX LMK tuning (Sultan-style, via /proc/apex_lmk/) ===
+# The apex_simple_lmk module exposes sysfs at /proc/apex_lmk/.
+# min_free_pages: minimum free pages before LMK triggers (default 6 = ~24MB)
+# cache_bonus_pages: pages that can be reclaimed from cache before killing (default 32 = ~128MB)
+on early-init
+    write /proc/apex_lmk/min_free_pages 6
+    write /proc/apex_lmk/cache_bonus_pages 32
+
+# === Boot completed: power + connectivity ===
+on property:sys.boot_completed=1
+    # Clone children for cpuset consistency
+    write /dev/cpuset/foreground/cgroup.clone_children 1
+    # Wi-Fi watchdog: aggressive scan interval (60s) + rssi threshold (30)
+    # Disabled on Android 16 — cmd wifi syntax changed. Use settings instead.
+    # write /sys/module/wifi/parameters/wifi_watchdog 1
+
+# === Screen state → kernel apex state machine ===
+on property:apex.screen=off
+    write /proc/apex/policy screen_off
+    # Dim backlight via BLX when screen off (battery savings)
+    write /sys/class/apex_blx/disable 0
+
+on property:apex.screen=on
+    write /proc/apex/policy screen_on
+    # Restore full backlight
+    write /sys/class/apex_blx/disable 1
+
+# === Gaming mode ===
+on property:apex.gaming=1
+    write /proc/apex/policy "game 1"
+    # Set apex governor on both clusters
+    write /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor apex
+    write /sys/devices/system/cpu/cpu4/cpufreq/scaling_governor apex
+    # GPU performance mode (Adreno 610)
+    write /sys/class/kgsl/kgsl-3d0/devfreq/governor performance
+    write /sys/class/kgsl/kgsl-3d0/devfreq/min_freq 600000000
+    # Raise thermal trip points (NOT disable — safety net must remain)
+    write /sys/class/thermal/thermal_zone0/trip_point_1_temp 65000
+    # CPU boost: enable input boost for touch responsiveness
+    write /sys/kernel/apex_cpu_boost/boost_ms 40
+    write /sys/kernel/apex_cpu_boost/duration_ms 3000
+
+on property:apex.gaming=0
+    write /proc/apex/policy "game 0"
+    # Restore normal thermal trip point
+    write /sys/class/thermal/thermal_zone0/trip_point_1_temp 55000
+    # Restore GPU governor + min freq
+    write /sys/class/kgsl/kgsl-3d0/devfreq/governor msm-adreno-tz
+    write /sys/class/kgsl/kgsl-3d0/devfreq/min_freq 320000000
+    # CPU boost: shorter duration for battery
+    write /sys/kernel/apex_cpu_boost/boost_ms 40
+    write /sys/kernel/apex_cpu_boost/duration_ms 1500
+
+# === Charging state → kernel ===
+on property:apex.charging=1
+    write /proc/apex/policy "charge 1"
+    # Enable charging: clear input_suspend
+    write /sys/class/qcom-battery/input_suspend 0
+on property:apex.charging=0
+    write /proc/apex/policy "charge 0"
+    # Stop charging: set input_suspend
+    write /sys/class/qcom-battery/input_suspend 1
+
+# === APEX Charge Manager initialization ===
+on boot
+    # Set default charge mode to balanced (18W, moderate heat)
+    write /proc/apex_charge/charge_mode 2
+    # No charge limit by default (0=disabled)
+    write /proc/apex_charge/charge_limit_percent 0
+    # No bypass by default
+    write /proc/apex_charge/bypass_charging 0
+    # No input suspend by default
+    write /proc/apex_charge/input_suspend 0
+    # Default thermal mitigation: index 0 (max current, let JEITA handle it)
+    write /proc/apex_charge/thermal_mitigation_idx 0
+
+# Charge limit control via system property
+on property:apex.charge_limit=*
+    write /proc/apex_charge/charge_limit_percent ${apex.charge_limit}
+
+# Charge mode control via system property
+on property:apex.charge_mode=*
+    write /proc/apex_charge/charge_mode ${apex.charge_mode}
+
+# Bypass charging control via system property
+on property:apex.bypass_charging=*
+    write /proc/apex_charge/bypass_charging ${apex.bypass_charging}
+
+# === Audio state → kernel ===
+on property:apex.audio=1
+    write /proc/apex/policy "audio 1"
+on property:apex.audio=0
+    write /proc/apex/policy "audio 0"
+
+# === ZRAM tuning (ZSTD + writeback, 4GB device) ===
+# ZRAM is configured in defconfig; these are runtime tunables.
+on early-init
+    # ZRAM disksize: 3GB (zram-backed, compressed ~3:1 = ~1GB real)
+    write /sys/block/zram0/disksize 3221225472
+    # ZSTD compressor (best ratio for ARM)
+    write /sys/block/zram0/comp_algorithm zstd
+    # Watermark store enabled (writeback idle pages to storage)
+    write /sys/block/zram0/backing_dev null

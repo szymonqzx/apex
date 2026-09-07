@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.apex.nfcforge">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.NFC" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
@@ -11,10 +10,9 @@
 
     <application
         android:allowBackup="false"
-        android:icon="@mipmap/ic_launcher"
         android:label="NFCForge"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Material3.Dark"
+        android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
         android:directBootAware="false">
 
         <activity
@@ -27,7 +25,6 @@
             </intent-filter>
         </activity>
 
-        <!-- NFC tag dispatch -->
         <activity
             android:name=".ui.TagDispatchActivity"
             android:exported="true"
