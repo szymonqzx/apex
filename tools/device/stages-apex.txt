@@ -1,0 +1,11 @@
+# Bisection stages for the APEX boot-hang (2026-09-07).
+# One stage per line: name | CONFIG options to enable (space-separated).
+# Each stage inherits the previous stage's features.
+#
+# Stage 1 is the plain Zepharo kernel (all APEX features off) — the
+# baseline that must boot before anything else is added.
+plain | KEEP
+ksu | CONFIG_KSU
+susfs | CONFIG_KSU_SUSFS
+baseband-guard | CONFIG_BBG
+thermal | CONFIG_APEX_THERMAL
