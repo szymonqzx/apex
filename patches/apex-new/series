@@ -1,5 +1,5 @@
 # APEX kernel patch series
-# Applied in order to the Zepharo R9 base (Linux 5.15.170)
+# Applied in order to the Zepharo base (Linux 5.15.211, see kernel/.apex-base)
 #
 # Format: <patch-name> <description>
 # Patches are applied by tools/apply-patches.sh
@@ -34,3 +34,9 @@ apex-thermal        Thermal history ring buffer (/proc/apex/thermal_history) + s
 
 # 9. PMIC watchdog — bind the PON WDT driver on pm8150/pm6125-family PMICs
 apex-wdt            Enable PMIC WDT (hard-reset on hang) + safe-mode boot basis
+
+# 10. Xiaomi device quirks (ported from ChicKernel, verified 2026-09-07;
+#     the boot-critical P0 fixes — sm5602 io-channel + dwc3 USB tethering —
+#     are already native in the Zepharo CLO base)
+apex-thermald-cores  Redirect mi_thermald low-battery hotplug to P-cores (ChicKernel 3e85c42)
+apex-vendor-kmsg     Suppress vendor module debug spam in printk (ChicKernel 06af5ac8)
