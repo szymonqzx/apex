@@ -14,6 +14,19 @@ build.log
 warnings.log
 *.build.log
 
+# Gradle / Android build output
+.gradle/
+build/
+.kotlin/
+local.properties
+*.apk
+*.jar
+!desktop/prebuilt/scrcpy-server.jar
+!ksu-module/system/bin/scrcpy-server.jar
+captures/
+.externalNativeBuild/
+.cxx/
+
 # Python
 __pycache__/
 .pytest_cache/
@@ -28,6 +41,9 @@ arm-linux-gnueabi-*/
 kernel/
 chroot/rootfs/rootfs/
 kernel-5.15.189-legacy/
+
+# Downloaded model weights (multi-GB — never commit)
+agent/llm/models/prebuilt/
 
 # Local-only
 .env

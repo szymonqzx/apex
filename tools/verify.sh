@@ -36,7 +36,12 @@ fail() { echo "  [FAIL] $1"; FAIL=$((FAIL + 1)); }
 # NB: no `grep -q` in any pipeline here — with `set -o pipefail`, -q exits on
 # first match, the producer gets SIGPIPE (141), and the pipeline is reported
 # as failed. Always consume the full stream: `| grep -i PAT >/dev/null`.
-in_image() { strings "$IMAGE" 2>/dev/null | grep -i "$1" >/dev/null; }
+#
+# IMAGE_STRINGS is extracted ONCE and reused: `strings` on the 37MB Image
+# takes ~0.5s per run, and running it per-check (~115x) made verify.sh take
+# ~55s. Grep over the cached blob instead.
+IMAGE_STRINGS=""
+in_image() { grep -i "$1" >/dev/null <<< "$IMAGE_STRINGS"; }
 
 echo "=== APEX kernel verification ==="
 
@@ -49,6 +54,8 @@ fi
 SIZE=$(du -h "$IMAGE" | cut -f1)
 SIZE_BYTES=$(stat -c%s "$IMAGE" 2>/dev/null || stat -f%z "$IMAGE" 2>/dev/null || echo 0)
 ok "Image: $IMAGE ($SIZE)"
+
+IMAGE_STRINGS="$(strings "$IMAGE" 2>/dev/null || true)"
 
 if [ "$SIZE_BYTES" -gt 52428800 ]; then
   warn "Image larger than 50MB ($SIZE) — may be over-configured"
@@ -76,7 +83,10 @@ else
   warn "No DTB files found (expected — GKI device, ROM provides DTB)"
 fi
 
-MODULE_COUNT=$(find "$OUT" -name "*.ko" 2>/dev/null | wc -l)
+# Exclude out/pentest-drivers — external out-of-tree driver builds (some are
+# 60-70MB with debug info) are not part of the kernel's own module set, and
+# running `strings` over them dominates runtime.
+MODULE_COUNT=$(find "$OUT" -path "*/pentest-drivers/*" -prune -o -name "*.ko" -print 2>/dev/null | wc -l)
 if [ "$MODULE_COUNT" -gt 0 ]; then
   ok "Kernel modules: $MODULE_COUNT"
 else
@@ -151,31 +161,29 @@ else
   warn "KASLR not detected in Image"
 fi
 
-if in_image "stackprotector\|stack_protector"; then
+if in_image "stackprotector\|stack_protector\|stack_chk"; then
   ok "Stack protector detected"
 else
   warn "Stack protector not detected"
 fi
 
 # --- 7. Toolchain / build --------------------------------------------------
-if in_image "thinlto"; then
-  ok "ThinLTO build detected"
+if grep -q "CONFIG_LTO_CLANG_THIN=y" "$OUT/.config" 2>/dev/null; then
+  ok "ThinLTO build detected (CONFIG_LTO_CLANG_THIN=y)"
 else
-  warn "ThinLTO not detected in strings (build flag, not always visible)"
+  warn "ThinLTO not detected (.config missing or CONFIG_LTO_CLANG_THIN unset)"
 fi
 
 # --- 8. Feature stack ------------------------------------------------------
-# Some features are modules (CONFIG_*=m): check Image and modules both.
-MODULE_STRINGS=""
-for ko in $(find "$OUT" -name "*.ko" 2>/dev/null); do
-  MODULE_STRINGS="$MODULE_STRINGS $(strings "$ko" 2>/dev/null)"
-done
-
-for feat in wireguard exfat bbr zram; do
-  if in_image "$feat" || echo "$MODULE_STRINGS" | grep -i "$feat" >/dev/null; then
-    ok "$feat detected"
+# Deterministic via .config (build-time truth) — avoids `strings`-ing every
+# kernel module, which dominated runtime (~40s for 470+ modules).
+for cfg in "wireguard:CONFIG_WIREGUARD" "exfat:CONFIG_EXFAT_FS" \
+           "bbr:CONFIG_TCP_CONG_BBR" "zram:CONFIG_ZRAM"; do
+  name="${cfg%%:*}"; c="${cfg##*:}"
+  if grep -qE "^${c}=(y|m)" "$OUT/.config" 2>/dev/null; then
+    ok "$name enabled ($c)"
   else
-    warn "$feat not detected"
+    warn "$name not enabled ($c not in .config)"
   fi
 done
 
