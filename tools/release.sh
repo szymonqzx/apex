@@ -157,8 +157,8 @@ cat > "$MANIFEST" << EOF
 # APEX Kernel Release Manifest
 version: ${VERSION}
 tag: ${TAG}
-base: zepharo-r9
-kernel_version: 5.15.170
+base: zepharo
+kernel_version: 5.15.211
 device: topaz/tapas (Redmi Note 12 4G)
 date: $(date -u +%Y-%m-%dT%H:%M:%SZ)
 

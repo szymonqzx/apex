@@ -69,7 +69,7 @@ if [ -n "$VERSION" ]; then
   ok "Kernel version: $VERSION (expect 5.15.x)"
   case "$VERSION" in
     5.15.*) : ;;
-    *) warn "Unexpected kernel version: $VERSION (base is 5.15.170)" ;;
+    *) warn "Unexpected kernel version: $VERSION (base is 5.15.211)" ;;
   esac
 else
   warn "Could not extract version string from Image"

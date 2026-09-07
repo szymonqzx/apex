@@ -1,9 +1,9 @@
 # APEX Kernel Patches
 
-The patch series in `apex-new/` is applied to the **Zepharo R9** base tree
-(Linux 5.15.170, `topnotchfreaks/kernel_msm-5.15` tag `ZEPHARO`) before
-building. The series is ordered by `apex-new/series` and applied by
-`tools/apply-patches.sh` (idempotent).
+The patch series in `apex-new/` is applied to the **Zepharo** base tree
+(Linux 5.15.211, `topnotchfreaks/kernel_msm-5.15` branch `zepharo` — see
+`kernel/.apex-base`) before building. The series is ordered by
+`apex-new/series` and applied by `tools/apply-patches.sh` (idempotent).
 
 ## Current series (v0.4)
 
