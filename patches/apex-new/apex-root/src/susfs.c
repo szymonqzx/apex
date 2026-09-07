@@ -29,6 +29,11 @@ LIST_HEAD(LH_MOUNT_ID_RECORDER);
 
 struct st_susfs_uname my_uname;
 
+#ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE
+static char spoofed_cmdline[SUSFS_MAX_LEN_CMDLINE] = {0};
+static bool is_cmdline_spoofed = false;
+#endif
+
 spinlock_t susfs_spin_lock;
 spinlock_t susfs_mnt_id_recorder_spin_lock;
 
@@ -442,6 +447,48 @@ int susfs_set_uname(struct st_susfs_uname* __user user_info) {
 	spin_unlock(&susfs_spin_lock);
 	return 0;
 }
+
+#ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE
+int susfs_set_cmdline(const char __user *user_buf, size_t len) {
+	char buf[SUSFS_MAX_LEN_CMDLINE];
+
+	if (!user_buf || len == 0 || len >= SUSFS_MAX_LEN_CMDLINE) {
+		SUSFS_LOGE("invalid cmdline buffer or length: %zu\n", len);
+		return 1;
+	}
+	// copy_from_user may fault/sleep — do it before taking the spinlock,
+	// then commit under the lock so readers never see a torn buffer.
+	if (copy_from_user(buf, user_buf, len)) {
+		SUSFS_LOGE("failed copying cmdline from userspace.\n");
+		return 1;
+	}
+	spin_lock(&susfs_spin_lock);
+	memcpy(spoofed_cmdline, buf, len);
+	spoofed_cmdline[len] = '\0';
+	is_cmdline_spoofed = true;
+	SUSFS_LOGI("spoofed cmdline set (%zu bytes)\n", len);
+	spin_unlock(&susfs_spin_lock);
+	return 0;
+}
+
+int susfs_get_spoofed_cmdline(char *out, size_t out_size) {
+	int ret = 0;
+
+	if (!out || out_size == 0)
+		return 0;
+	spin_lock(&susfs_spin_lock);
+	if (is_cmdline_spoofed) {
+		size_t n = strnlen(spoofed_cmdline, SUSFS_MAX_LEN_CMDLINE - 1);
+		if (n >= out_size)
+			n = out_size - 1;
+		memcpy(out, spoofed_cmdline, n);
+		out[n] = '\0';
+		ret = 1;
+	}
+	spin_unlock(&susfs_spin_lock);
+	return ret;
+}
+#endif
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4,14,0)
 int susfs_sus_path_by_path(struct path* file, int* errno_to_be_changed, int syscall_family)

@@ -25,6 +25,7 @@ static long ksu_handle_susfs_prctl(int orig_nr, const struct pt_regs *regs)
 	unsigned long option = PT_REGS_PARM1(regs);
 	unsigned long arg2 = PT_REGS_PARM2(regs);
 	unsigned long arg3 = PT_REGS_PARM3(regs);
+	unsigned long arg4 = PT_REGS_SYSCALL_PARM4(regs);
 	unsigned long arg5 = PT_REGS_PARM5(regs);
 	int error = 0;
 
@@ -139,6 +140,17 @@ static long ksu_handle_susfs_prctl(int orig_nr, const struct pt_regs *regs)
 			return 0;
 		error = susfs_set_uname((struct st_susfs_uname __user *)arg3);
 		pr_info("susfs: CMD_SUSFS_SET_UNAME -> ret: %d\n", error);
+		copy_to_user((void __user *)arg5, &error, sizeof(error));
+		return 0;
+#endif
+#ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE
+	case CMD_SUSFS_SET_CMDLINE:
+		// prctl(KERNEL_SU_OPTION, CMD_SUSFS_SET_CMDLINE, buf, len, &error)
+		if (!access_ok((void __user *)arg3, arg4) ||
+		    !access_ok((void __user *)arg5, sizeof(error)))
+			return 0;
+		error = susfs_set_cmdline((const char __user *)arg3, arg4);
+		pr_info("susfs: CMD_SUSFS_SET_CMDLINE -> ret: %d\n", error);
 		copy_to_user((void __user *)arg5, &error, sizeof(error));
 		return 0;
 #endif

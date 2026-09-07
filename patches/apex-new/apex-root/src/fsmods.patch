@@ -683,3 +683,32 @@ diff --git a/Makefile b/kernel/Makefile
  core-$(CONFIG_BLOCK)	+= block/
  core-$(CONFIG_IO_URING)	+= io_uring/
  
+diff --git a/fs/proc/cmdline.c b/kernel/fs/proc/cmdline.c
+--- a/fs/proc/cmdline.c
++++ b/kernel/fs/proc/cmdline.c
+@@ -1,12 +1,24 @@
+ // SPDX-License-Identifier: GPL-2.0
+ #include <linux/fs.h>
+ #include <linux/init.h>
+ #include <linux/proc_fs.h>
+ #include <linux/seq_file.h>
++#include <linux/cred.h>
++#include <linux/susfs.h>
+ 
+ static int cmdline_proc_show(struct seq_file *m, void *v)
+ {
++#ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE
++	if (uid_matches_suspicious_path()) {
++		char buf[SUSFS_MAX_LEN_CMDLINE];
++		if (susfs_get_spoofed_cmdline(buf, sizeof(buf))) {
++			seq_puts(m, buf);
++			seq_putc(m, '\n');
++			return 0;
++		}
++	}
++#endif
+ 	seq_puts(m, saved_command_line);
+ 	seq_putc(m, '\n');
+ 	return 0;
+ }
+ 

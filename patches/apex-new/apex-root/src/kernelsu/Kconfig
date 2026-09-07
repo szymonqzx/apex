@@ -99,6 +99,11 @@ config KSU_SUSFS_SPOOF_UNAME
 	depends on KSU_SUSFS
 	default y
 
+config KSU_SUSFS_SPOOF_CMDLINE
+	bool "Spoof cmdline (/proc/cmdline)"
+	depends on KSU_SUSFS
+	default y
+
 config KSU_SUSFS_ENABLE_LOG
 	bool "Log SUSFS to kernel log"
 	depends on KSU_SUSFS

@@ -21,9 +21,11 @@
 #define CMD_SUSFS_ADD_SUS_MAPS 0x55560
 #define CMD_SUSFS_UPDATE_SUS_MAPS 0x55561
 #define CMD_SUSFS_ADD_SUS_MEMFD 0x55562
+#define CMD_SUSFS_SET_CMDLINE 0x55563
 
 #define SUSFS_MAX_LEN_PATHNAME 256 // 256 should address many paths already unless you are doing some strange experimental stuff, then set your own desired length
 #define SUSFS_MAX_LEN_MFD_NAME 248
+#define SUSFS_MAX_LEN_CMDLINE 2048 // arm64 COMMAND_LINE_SIZE
 #define SUSFS_MAX_SUS_MNTS 300 // I think 300 is now enough? This includes the mount entries for each process and sus mounts added by user 
 #define SUSFS_MAX_SUS_MAPS 200 // I think 200 is now enough? Tell me why if you have over 200 entries
 
@@ -183,6 +185,8 @@ int susfs_add_sus_proc_fd_link(struct st_susfs_sus_proc_fd_link* __user user_inf
 int susfs_add_sus_memfd(struct st_susfs_sus_memfd* __user user_info);
 int susfs_add_try_umount(struct st_susfs_try_umount* __user user_info);
 int susfs_set_uname(struct st_susfs_uname* __user user_info);
+int susfs_set_cmdline(const char __user *user_buf, size_t len);
+int susfs_get_spoofed_cmdline(char *out, size_t out_size);
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4,14,0)
 int susfs_sus_path_by_path(struct path* file, int* errno_to_be_changed, int syscall_family);

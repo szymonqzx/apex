@@ -5,15 +5,25 @@
 # hiding stack KSU modules from /system/apex/modules/*.zip into
 # /data/adb/modules/. Only runs once — creates a sentinel file.
 #
-# Modules installed:
-#   1. zygisk_next  — Zygisk runtime for KSU-Next
-#   2. shamiko      — denylist-based root hiding
-#   3. hma_oss      — HMA package/path hiding
-#   4. tricky_store — hardware-backed KeyStore keybox injection
-#   5. yurikey      — keybox manager (one-time setup)
+# Modules installed (drop the zips into /system/apex/modules/):
+#   1. zygisk_next    — Zygisk runtime (needed by LSPosed/HMA)
+#   2. lsposed_next   — LSPosed framework for KSU-Next (NOT the JingMatrix fork)
+#   3. lineage_hider  — APEX LineageOS hider (io.apex.lineagehider, adb-installed APK)
+#   4. hma_oss        — package/path hiding for the targets
+#   5. susfs4ksu      — kernel-level hiding (sus_path/sus_mount/cmdline spoof)
+#   6. tricky_store_oss — attestation keybox (FOSS; proprietary fork also works)
+#   7. yurikey        — keybox manager (one-time setup)
+#
+# NOTE: shamiko was REMOVED from the stack — Native Detector v7.7.0 detects
+# it specifically. Manual-hook KSU + susfs replaces it.
+#
+# lineage_hider is an APK, not a KSU module: adb install it and enable/scope it
+# in the LSPosed manager.
 #
 # After installation, the user must:
-#   - Configure denylist via Apex Control or hidden_packages.list
+#   - Run configure_susfs.sh (hiding/configure_susfs.sh) to write the
+#     susfs4ksu-module config
+#   - Configure HMA via configure_hiding.sh or hidden_packages.list
 #   - Install their keybox via Yurikey (separate, one-time)
 #
 # Brick-safety: this script only writes to /data/adb/modules/ (KSU
@@ -29,7 +39,7 @@ KSU_BIN="/data/adb/ksu/bin/ksud"
 
 log() {
     echo "apex_install_modules: $*" >&2
-    log -t apex_install_modules -p i "$*"
+    command log -t apex_install_modules -p i "$*"
 }
 
 # Already installed?
@@ -87,7 +97,7 @@ done
 
 # Create sentinel
 touch "$SENTINEL"
-log "all modules installed — user must configure denylist + keybox"
+log "all modules installed — user must configure susfs + denylist + keybox"
 log "sentinel created at $SENTINEL"
 
 exit 0

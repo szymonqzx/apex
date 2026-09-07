@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+      APEX Lineage Hider — LSPosed (libxposed API 100+) module.
+      No launcher activity: hook-only module, enabled and scoped from the
+      LSPosed manager (or Vector CLI). Scope it ONLY to the app(s) that must
+      not see LineageOS (never the system framework, never Google apps).
+      Registration is via META-INF/xposed/{module.prop,java_init.list},
+      per the libxposed API (no legacy xposedmodule meta-data).
+    -->
+    <application
+        android:label="APEX Lineage Hider"
+        android:hasCode="true"
+        android:allowBackup="false" />
+
+</manifest>

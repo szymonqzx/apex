@@ -1,0 +1,63 @@
+# APEX Flash Set — 2026-09-07
+# Everything needed to flash the hiding stack on tapas/topaz
+# (LineageOS 23.2 / Android 16, Zepharo R9 base, 5.15.211)
+
+kernel:
+  file: apex-kernel-0.4.0-zepharo-anykernel3.zip
+  sha256: 63184761d15cd7f6c33486951adb73936c0ff085f10b80e137ec43fd8e091885
+  size: 236M
+  base: topnotchfreaks/kernel_msm-5.15 branch zepharo (5.15.211)
+  features: KernelSU-Next + SUSFS (SPOOF_CMDLINE ported), APEX sysfs/thermal/BBG
+  note: AnyKernel3 — flash in OrangeFox/TWRP; kernel-only (GKI, no ramdisk)
+
+hiding_stack:
+  file: apex-hiding-stack-1.1.0.zip
+  sha256: 4ae72273d28fddd49b457124e4d73d8c93e21e1eff545901b458ca40a751b51f
+  size: 13M
+  contents:
+    - zygisk_next.zip (v1.5.0)
+    - hma_oss.zip (oss-166)
+    - susfs4ksu.zip (v1.5.2+ R28)
+    - tricky_store_oss.zip (v3.1.0)
+    - yurikey.zip (v3.0.6)
+    - lineage_hider.apk (io.apex.lineagehider, libxposed 100+; v2: + PackageManager
+      filtering, getDeclaredInstances/waitForService hooks)
+    - configure_susfs.sh / configure_hiding.sh / install_modules.sh / denylist.conf
+  note: extract and place zips in /system/apex/modules/ (or install via KSU manager);
+        lineage_hider.apk is adb-installed and scoped in LSPosed
+
+docs (in repo docs/):
+  - DETECTION_COUNTERMEASURES.md — every detection -> countermeasure + status
+  - NATIVE_BINDER_HIDING.md — the one residual (native servicemanager enum):
+    rename-at-build recommended, Zygisk Dobby module as runtime alternative
+  - REBRAND.md — de-lineage endgame playbook
+tools:
+  - tools/rebrand-lineage.sh — hardened rebrand sweep (verified on test tree)
+
+rom_module:
+  file: apex-rom-ksu-module-v1.0.0.zip
+  sha256: 1fbea9f8f162a7bd124f34a1ee81c7ed4bf5795949d0952e5fa939bce24a3404
+  contents: ApexSystemServices, ApexControl, NFCForge, PTKTUI APKs + init rc + PIF overlay
+  note: install via KSU manager
+
+manual_steps (required, not in zips):
+  - lsposed_next: no stable release asset — fetch from F1xGOD/LSPosed-Next
+    GitHub Actions artifacts or its Telegram channel; drop zip in
+    /system/apex/modules/
+  - keybox.xml: install via Yurikey (one-time) -> /data/adb/tricky_store/keybox.xml
+  - LineageOS developer options: Root access -> Disabled (kills init.svc.adb_root)
+  - KSU manager: per-app "Umount modules" for every package in the [denylist]
+    section of denylist.conf; "hide manager" to rename its /data/app dir
+  - edit BOOT_HASH in configure_susfs.sh if the device's TEE boot hash differs
+
+flash_order:
+  1. kernel:     flash apex-kernel-0.4.0-zepharo-anykernel3.zip in recovery
+  2. modules:    install hiding-stack zips via KSU manager (or first-boot installer)
+  3. module apk: adb install lineage_hider.apk; enable + scope in LSPosed
+  4. config:     push configure_susfs.sh + denylist.conf to /data/adb/apex/,
+                 run configure_susfs.sh then configure_hiding.sh
+  5. reboot, verify with Native Detector (pinned version) + Integrity Checker
+
+build_notes:
+  kernel_build: incremental, 459s, 491 modules, CONFIG_KSU_SUSFS_SPOOF_CMDLINE=y
+  artifacts_verified: patch dry-run clean, shellcheck clean, module APK built
