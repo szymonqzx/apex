@@ -56,15 +56,18 @@ releases/               # Release artifacts (zip + checksum + manifest)
 Requirements: clang 22+, LLVM binutils, `aarch64-linux-gnu-gcc`, `zip`,
 `bc`, `bison`, `flex`, `libssl-dev`, `libelf-dev`, python3 + pytest.
 
+A `Makefile` wraps the common pipeline — `make help` lists every target.
+The manual equivalents:
+
 ```bash
 # 1. Fetch the Zepharo zepharo branch to kernel/
 #    (topnotchfreaks/kernel_msm-5.15, branch zepharo — 5.15.211 + CLO/LTS)
-#    (topnotchfreaks/kernel_msm-5.15, tag ZEPHARO)
 
 # 2. Apply the patch series (idempotent)
 ./tools/apply-patches.sh
 
-# 3. Build (incremental by default; --clean for a full rebuild)
+# 3. Build (incremental by default; --clean for a full rebuild;
+#    ccache is used automatically when installed)
 ./tools/build-kernel.sh
 
 # 4. Verify the build output
@@ -73,6 +76,9 @@ Requirements: clang 22+, LLVM binutils, `aarch64-linux-gnu-gcc`, `zip`,
 # 5. Package a flashable zip
 ./tools/package-anykernel3.sh
 ```
+
+CI caches both the AOSP clang toolchain and a per-variant ccache, so
+repeat builds in GitHub Actions are ~2–3× faster than cold builds.
 
 ## Installing
 

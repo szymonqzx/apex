@@ -55,6 +55,88 @@ resilient flash/debug toolset) and `docs/FLASH_SESSION_2026-09-07.md`.
 | kernel_builder | axshhayy/kernel_builder | Matrix CI (vanilla/ksu/ksus), workflow_dispatch config, 20GB swap for LTO, clang r547379 | Model for APEX kernel CI matrix |
 | android-gki-patched-kernel-builder | im-yuuki/ | GKI patched kernel builder workflow | Reference |
 
+## Second survey (2026-09-07, verified via GitHub API)
+
+Follow-up sweep for the completion push. All repos verified to exist on
+2026-09-07 via `gh api`; stale = no commits in the last ~12 months.
+
+### Device ROM reference trees — topaz/tapas (stale but reference-quality)
+
+The only complete device+vendor+kernel sets for this exact device. All were
+maintained until the ROM projects dropped the device (2024); use them as the
+blob/config/bring-up reference for the real LOS build (Phase 2).
+
+| Tree | Repo | Notes |
+|---|---|---|
+| crDroid device | crdroidandroid/android_device_xiaomi_topaz | Official crDroid 10/11 tree (Android 14/15 era), pushed 2024-12 |
+| crDroid kernel | crdroidandroid/android_kernel_xiaomi_topaz | Device kernel for the crDroid tree, pushed 2024-11 |
+| crDroid vendor | crdroidandroid/proprietary_vendor_xiaomi_topaz | Proprietary blobs (what our overlay design currently hand-writes) |
+| SD685 org (full bring-up) | Xiaomi-SD685-Devs/{device_xiaomi_topaz, vendor_xiaomi_topaz, device_xiaomi_topaz-kernel, rom-build, vendor_lineage, hardware_qcom_*, vendor_qcom_opensource_*} | Complete org for the Redmi 12 4G family; pushed 2024 |
+| tapas tree | AliHasan7671/android_device_xiaomi_tapas | tapas variant reference |
+| tapas recovery | PitchBlackRecoveryProject/android_device_xiaomi_tapas-pbrp | PBRP recovery tree for tapas |
+
+### SM6225 kernel references (SoC family)
+
+| Repo | Notes |
+|---|---|
+| muralivijay/android_kernel_xiaomi_sm6225-5.15 | **5.15** bringup for the SM6225 family (spes), LA.VENDOR 13.2.1 tags; WIP, pushed 2025-10 — best diff reference for 5.15 porting |
+| PixelExperience-Devices/{device,kernel}_xiaomi_sm6225-common | PE common trees |
+| AOSPA/android_{device,kernel}_xiaomi_sm6225-common | Paranoid Android common trees |
+| CHRISL7/kernel_xiaomi_sm6225 | stale (2024) |
+
+### Kernel build CI / actions (active)
+
+| Repo | What it is | APEX relevance |
+|---|---|---|
+| xiaoleGun/KernelSU_Action (719★, 2026-07) | The de-facto KSU/SUSFS kernel build GitHub Action (kernel + AnyKernel3 zip) | Reference for our matrix workflow; drop-in alternative to hand-rolled steps |
+| dabao1955/kernel_build_action (180★) | Similar KSU build action | Reference |
+| PhamtomK12/Android-Kernel-Builder (97★) | Android kernel builder action | Reference |
+| hendrikmuhs/ccache-action (186★, active) | Standard ccache caching action for GitHub Actions | Our CI now caches ccache directly (ci.yml, ci-kernel-matrix.yml); switch to this action if the hand-rolled cache misbehaves |
+| kernelci/kernelci-core + kernelci-pipeline (active) | KernelCI core + pipeline | Heavyweight; reference only — overkill for a single-device personal kernel |
+
+### Debugging / verification (post-boot, once the kernel runs on hardware)
+
+| Repo | What it is | APEX relevance |
+|---|---|---|
+| osandov/drgn (2086★, active) | Programmable Python debugger for the Linux kernel (live + vmcore) | pstore/vmcore analysis after device boots; pairs with tools/device/collect-boot-log.sh |
+| google/syzkaller (6320★, active) | Coverage-guided kernel fuzzer | Aspirational; not practical on-device for this project |
+
+### ROM / OTA tooling (Phase 2+)
+
+| Repo | What it is | APEX relevance |
+|---|---|---|
+| lineageos4microg/docker-lineage-cicd (558★, active) | Containerized LineageOS CI/CD builds (docker run + build + OTA output) | The cleanest way to run the ~80GB LOS sync/build without polluting the dev disk; adopt for Phase 2 |
+| LineageOS/android_packages_apps_Updater (76★, active) | Official LineageOS OTA updater app | OTA delivery once we have a ROM to update |
+| Evolution-X/OTA (46★, active) | OTA server for EvoX-style builds (PHP, JSON feeds) | Simple OTA feed option alongside payload-dumper-go |
+
+### Hiding stack — verified (matches what we already package)
+
+| Repo | What it is | In our hiding stack? |
+|---|---|---|
+| Dr-TSNG/ZygiskNext (10.5k★, active) | Standalone Zygisk implementation | Yes (v1.5.0) |
+| Dr-TSNG/Hide-My-Applist (5.5k★, active) | Xposed applist-detection interceptor | Yes (hma_oss) |
+| 5ec1cff/TrickyStore (6.3k★, active) | Attestation keybox injection (TEE/KeyStore) | Yes (tricky_store_oss v3.1.0) |
+| Yurii0307/yurikey (1.9k★) | Keybox installer app (one-time setup) | Yes (v3.0.6) |
+
+### Dead references (do not use — verified 404 on 2026-09-07)
+
+- chiteroman/PlayIntegrityFix — account gone (the PIF approach is superseded
+  by TrickyStore + keybox anyway)
+- dakkshesh07/kernel_build_action — account gone; use
+  xiaoleGun/KernelSU_Action instead
+
+### Adoption updates since the first survey
+
+1. **CI caching — DONE.** ccache (auto-detected in `tools/build-kernel.sh`,
+   `CCACHE_DIR` default `.ccache/`) + AOSP clang + ccache caching in both
+   workflows.
+2. **Kernel CI matrix** — keep ours (already mirrors the WildKernels stages);
+   xiaoleGun/KernelSU_Action is the fallback if we want a maintained action.
+3. **Phase 2 LOS build** — prefer docker-lineage-cicd over a manual sync;
+   use the crDroid/Xiaomi-SD685-Devs trees as the blob/bring-up reference.
+4. **drgn** — add to the device toolchain for pstore/vmcore analysis once the
+   kernel boots.
+
 ## Gap analysis — what our toolset adds
 
 Nothing in the ecosystem provides the **flash → boot-verify → rollback loop**
