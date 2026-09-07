@@ -34,11 +34,14 @@ done
 
 run_once() {
   # Run the fastboot command; kill it if it exceeds STUCK_KILL_AFTER.
-  local out err rc
-  out=$("$FASTBOOT_BIN" "$@" 2>/tmp/fbr.err) &
-  local pid=$!
-  # poll for completion, kill when stuck
-  local waited=0
+  # Output goes to temp files — `out=$(cmd) &` would background the
+  # ASSIGNMENT and leave $out unset (a real bug that silently aborted
+  # every attempt under `set -u`).
+  local tmpout tmperr rc out err pid waited
+  tmpout=$(mktemp); tmperr=$(mktemp)
+  "$FASTBOOT_BIN" "$@" >"$tmpout" 2>"$tmperr" &
+  pid=$!
+  waited=0
   while kill -0 "$pid" 2>/dev/null; do
     sleep 2
     waited=$((waited + 2))
@@ -46,18 +49,19 @@ run_once() {
       echo "  [fastboot-retry] transfer stuck ${waited}s — killing and retrying" >&2
       kill -9 "$pid" 2>/dev/null || true
       wait "$pid" 2>/dev/null || true
+      rm -f "$tmpout" "$tmperr"
       return 1
     fi
   done
   wait "$pid"
   rc=$?
-  err=$(cat /tmp/fbr.err 2>/dev/null || true)
+  out=$(cat "$tmpout" 2>/dev/null || true)
+  err=$(cat "$tmperr" 2>/dev/null || true)
+  rm -f "$tmpout" "$tmperr"
   if [ $rc -eq 0 ]; then
-    echo "$out"
+    [ -n "$out" ] && echo "$out"
     return 0
   fi
-  # Fastboot sometimes errors on the link; treat "no devices" and
-  # "does not support slots" as retryable.
   echo "  [fastboot-retry] failed: ${out} ${err}" >&2
   return 1
 }
