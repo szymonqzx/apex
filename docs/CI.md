@@ -68,8 +68,21 @@ Trigger: `gh workflow run ci-r9-exact.yml` (or the Actions tab).
 ### `.github/workflows/rom-build.yml` — full ROM (self-hosted)
 `runs-on: [self-hosted, linux, x64, rom-builder]`. Docker-lineage-cicd for
 `lineage-23.2` / `topaz`, volumes under `/srv/apex-rom`, APEX local
-manifests from `rom-overlays/device/`, uploads zips + logs. Preflight fails
-fast if <100GB free.
+manifest from `rom-overlays/manifests/topaz.xml`, uploads zips + logs.
+Preflight fails fast if <100GB free.
+
+### `.github/workflows/rom-build-crave.yml` — full ROM (foss.crave.io)
+The no-hardware path: the runner only orchestrates `crave devspace`; the
+sync+build run inside a persistent Crave devspace
+(`/crave-devspaces/apex-los23`). Requires `CRAVE_USERNAME` + `CRAVE_TOKEN`
+secrets (foss.crave.io dashboard → API Keys). Local equivalent:
+`crave devspace -- "bash -s" < tools/build-rom-crave.sh`.
+
+The topaz bringup uses the `xiaomi-topaz-dev` org's lineage-23.2 trees
+(device + prebuilt kernel + proprietary vendor + sm6225 CAF HAL forks) —
+see `rom-overlays/manifests/topaz.xml`. The device tree consumes a
+prebuilt kernel (`device/xiaomi/topaz-kernel`); ship APEX by replacing
+`images/kernel` with our Image (`APEX_KERNEL=1 APEX_IMAGE=...`).
 
 ## Running the ROM build — attach a self-hosted runner
 

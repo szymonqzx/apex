@@ -1,0 +1,122 @@
+name: APEX ROM Build (Crave)
+
+# Builds the full LineageOS 23.2 ROM for topaz inside a foss.crave.io
+# devspace — the heavy lifting (source sync + compile) happens on Crave's
+# build infra, NOT on the GitHub runner. The runner only orchestrates via
+# the crave CLI (this is the pattern Crave explicitly supports — see
+# sounddrill31/crave_aosp_builder; run builds through devspace to stay on
+# the right side of the Actions terms).
+#
+# Required repo secrets:
+#   CRAVE_USERNAME — foss.crave.io account name (dashboard → API Keys)
+#   CRAVE_TOKEN    — foss.crave.io API token
+#
+# The devspace (project folder /crave-devspaces/apex-los23) is persistent:
+# the ~80GB source sync happens once; later runs reuse the tree + ccache.
+#
+# Same flow works locally without GitHub at all:
+#   crave devspace -- "bash -s" < tools/build-rom-crave.sh
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build type'
+        required: false
+        default: 'userdebug'
+        type: choice
+        options: [userdebug, eng, user]
+      clean:
+        description: 'Wipe devspace source tree first'
+        required: false
+        default: 'false'
+        type: boolean
+      sync_only:
+        description: 'Only sync source, do not build'
+        required: false
+        default: 'false'
+        type: boolean
+
+jobs:
+  rom:
+    name: topaz @ lineage-23.2 via foss.crave.io
+    runs-on: ubuntu-latest
+    timeout-minutes: 720
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check credentials
+        run: |
+          if [ -z "${CRAVE_USERNAME:-}" ] || [ -z "${CRAVE_TOKEN:-}" ]; then
+            echo "::error::Set CRAVE_USERNAME and CRAVE_TOKEN repo secrets"
+            echo "  (foss.crave.io dashboard → API Keys → crave.conf)"
+            exit 1
+          fi
+        env:
+          CRAVE_USERNAME: ${{ secrets.CRAVE_USERNAME }}
+          CRAVE_TOKEN: ${{ secrets.CRAVE_TOKEN }}
+
+      - name: Install crave CLI
+        run: |
+          mkdir -p "$HOME/bin"
+          curl -s https://raw.githubusercontent.com/accupara/crave/master/get_crave.sh | bash -s --
+          mv crave "$HOME/bin/" 2>/dev/null || \
+            sudo mv /usr/local/bin/crave "$HOME/bin/crave" 2>/dev/null || true
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+          crave version
+
+      - name: Configure crave.conf
+        run: |
+          python3 - <<'PYEOF'
+          import json, os
+          conf = {
+            "username": os.environ["CRAVE_USERNAME"],
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": os.environ["CRAVE_TOKEN"],
+              "User-Agent": "Crave",
+            },
+            "projects": [],
+            "server": "https://foss.crave.io/api",
+          }
+          with open("crave.conf", "w") as f:
+              json.dump(conf, f)
+          PYEOF
+        env:
+          CRAVE_USERNAME: ${{ secrets.CRAVE_USERNAME }}
+          CRAVE_TOKEN: ${{ secrets.CRAVE_TOKEN }}
+
+      - name: Run ROM build in devspace
+        run: |
+          # Ship the build script into the devspace and run it there.
+          SCRIPT_B64=$(base64 -w0 tools/build-rom-crave.sh)
+          crave devspace -- "
+            echo $SCRIPT_B64 | base64 -d > /tmp/build-rom-crave.sh
+            chmod +x /tmp/build-rom-crave.sh
+            CLEAN='${{ inputs.clean }}' \
+            SYNC_ONLY='${{ inputs.sync_only }}' \
+            BUILD_TYPE='${{ inputs.build_type }}' \
+            bash /tmp/build-rom-crave.sh
+          "
+
+      - name: Pull ROM artifacts
+        if: inputs.sync_only != 'true'
+        run: |
+          mkdir -p rom-out
+          crave pull \
+            "/crave-devspaces/apex-los23/out/target/product/topaz/lineage-*.zip" \
+            rom-out/ || {
+            echo "crave pull failed — artifacts remain in the devspace:"
+            crave devspace -- \
+              "ls -lh /crave-devspaces/apex-los23/out/target/product/topaz/*.zip"
+          }
+          ls -lh rom-out/
+
+      - name: Upload artifacts
+        if: inputs.sync_only != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: apex-rom-topaz-lineage-23.2
+          path: rom-out/*.zip
+          retention-days: 30
+          if-no-files-found: warn

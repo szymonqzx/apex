@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- APEX local manifest — LineageOS 23.2 for Xiaomi Redmi Note 12 4G (topaz).
+
+     Place in .repo/local_manifests/ after `repo init -b lineage-23.2`.
+
+     Tree set: xiaomi-topaz-dev org (the active lineage-23.2 topaz bringup).
+     LOS 23.2 does NOT ship sm6225 CAF projects — they come from the
+     xiaomi-topaz-dev forks at branch lineage-23.2-caf-sm6225, and their
+     qcom-caf/common fork adds the sm6225 os_pickup guards.
+
+     Kernel strategy: the device tree uses a PREBUILT kernel
+     (TARGET_NO_KERNEL_OVERRIDE, device/xiaomi/topaz-kernel with
+     images/kernel + dtbs + dtbo + kernel-headers + vendor_dlkm modules).
+     To ship the APEX kernel in the ROM, replace
+     device/xiaomi/topaz-kernel/images/kernel with our out/.../Image and
+     drop our .ko set into modules/vendor_dlkm/ — see
+     tools/build-rom-crave.sh (APEX_KERNEL=1 path). -->
+
+<manifest>
+
+  <remote name="topazdev"
+          fetch="https://github.com/xiaomi-topaz-dev"
+          review="https://github.com/" />
+  <remote name="rn124g"
+          fetch="https://github.com/rn124g-development"
+          review="https://github.com/" />
+  <remote name="lineage"
+          fetch="https://github.com/LineageOS"
+          review="https://review.lineageos.org/" />
+
+  <!-- APEX repo itself — landed at vendor/apex in the LOS tree so the
+       product makefile can inherit apex_device.mk / apex_lineage_topaz.mk -->
+  <project path="vendor/apex"
+           name="szymonqzx/apex"
+           remote="github"
+           revision="main" />
+
+  <!-- qcom-caf/common fork with sm6225 os_pickup guards (replaces stock) -->
+  <remove-project name="LineageOS/android_hardware_qcom-caf_common" />
+  <project path="hardware/qcom-caf/common"
+           name="android_hardware_qcom-caf_common"
+           remote="topazdev"
+           revision="lineage-23.2" />
+
+  <!-- CAF sm6225 HALs -->
+  <project path="hardware/qcom-caf/sm6225/audio/primary-hal"
+           name="android_hardware_qcom_audio-ar"
+           remote="topazdev" revision="lineage-23.2-caf-sm6225" />
+  <project path="hardware/qcom-caf/sm6225/audio/pal"
+           name="android_vendor_qcom_opensource_arpal-lx"
+           remote="topazdev" revision="lineage-23.2-caf-sm6225" />
+  <project path="hardware/qcom-caf/sm6225/audio/agm"
+           name="android_vendor_qcom_opensource_agm"
+           remote="topazdev" revision="lineage-23.2-caf-sm6225" />
+  <project path="hardware/qcom-caf/sm6225/audio/graphservices"
+           name="android_vendor_qcom_opensource_audioreach-graphservices"
+           remote="topazdev" revision="lineage-23.2-caf-sm6225" />
+  <project path="hardware/qcom-caf/sm6225/display"
+           name="android_hardware_qcom_display"
+           remote="topazdev" revision="lineage-23.2-caf-sm6225" />
+  <project path="hardware/qcom-caf/sm6225/dataipa"
+           name="android_vendor_qcom_opensource_dataipa"
+           remote="topazdev" revision="lineage-23.2-caf-sm6225" />
+  <project path="hardware/qcom-caf/sm6225/data-ipa-cfg-mgr"
+           name="android_vendor_qcom_opensource_data-ipa-cfg-mgr"
+           remote="topazdev" revision="lineage-23.2-caf-sm6225" />
+  <!-- media: xiaomi-topaz-dev has no sm6225 media fork; use the
+       rn124g-development CAF sm6225 media HAL (branch sixteen = A16) -->
+  <project path="hardware/qcom-caf/sm6225/media"
+           name="android_hardware_qcom-caf_sm6225_media"
+           remote="rn124g" revision="sixteen" />
+
+  <!-- QCOM vendor sepolicy for sm6225 (picked up via
+       device/qcom/sepolicy_vndr/SEPolicy.mk os_pickup guard from
+       qcom-caf/common) -->
+  <project path="device/qcom/sepolicy_vndr/sm6225"
+           name="android_device_qcom_sepolicy_vndr"
+           remote="topazdev" revision="lineage-23.2-caf-sm6225" />
+
+  <!-- Device / kernel / vendor trees -->
+  <project path="device/xiaomi/topaz"
+           name="android_device_xiaomi_topaz"
+           remote="topazdev" revision="lineage-23.2" />
+  <project path="device/xiaomi/topaz-kernel"
+           name="android_device_xiaomi_topaz-kernel"
+           remote="topazdev" revision="lineage-23.2" />
+  <project path="vendor/xiaomi/topaz"
+           name="proprietary_vendor_xiaomi_topaz"
+           remote="topazdev" revision="lineage-23.2" />
+
+  <!-- Xiaomi hardware interfaces (SOTER, touch features, etc.) — not in
+       the LOS 23.2 default manifest -->
+  <project path="hardware/xiaomi"
+           name="LineageOS/android_hardware_xiaomi"
+           remote="lineage" revision="lineage-23.2" />
+
+</manifest>

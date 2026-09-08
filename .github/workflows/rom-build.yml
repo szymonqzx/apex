@@ -59,8 +59,10 @@ jobs:
         run: |
           BASE=/srv/apex-rom
           sudo mkdir -p $BASE/{src,zips,logs,ccache,local_manifests}
-          # APEX local manifests: device tree overrides / APEX overlays
-          sudo cp -r rom-overlays/device/* $BASE/local_manifests/ 2>/dev/null || true
+          # APEX local manifest: topaz device trees + sm6225 CAF HALs +
+          # the APEX overlay repo (makefiles in rom-overlays/device/ are
+          # product fragments, not manifests — don't copy those here)
+          sudo cp rom-overlays/manifests/topaz.xml $BASE/local_manifests/ 2>/dev/null || true
           ls -la $BASE/local_manifests/
 
       - name: Build ROM
