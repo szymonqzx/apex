@@ -90,6 +90,12 @@ jobs:
           mkdir -p /tmp/apex-ccache
           echo "CCACHE_DIR=/tmp/apex-ccache" >> "$GITHUB_ENV"
           echo "CCACHE_SLOPPINESS=time_macros,pch_defines,include_file_ctime,include_file_mtime" >> "$GITHUB_ENV"
+          # 5G default evicts mid-build for a kernel this size; 10G cap +
+          # compression keeps a full build resident so warm runs hit.
+          # (GITHUB_ENV applies to later steps — export CCACHE_DIR inline)
+          export CCACHE_DIR=/tmp/apex-ccache
+          ccache -M 10G
+          ccache -o compression=true
 
       - name: Fetch kernel source
         run: |
