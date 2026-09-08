@@ -1,101 +1,150 @@
 name: R9-Exact Reproducible Build
 
 # THE decisive bisection experiment (see docs/CI.md + GBrain
-# apex-device-flash-session-2026-09-08, Round 7-9):
+# apex-device-flash-session-2026-09-08, Round 7-9).
 #
-#   Official TNF R9 (boots on device):  clang r450784e (14.0.7) + LTO full
-#                                       + gki_defconfig + NO -march override
-#   Our R9 repro (does NOT boot):       clang r547379 (20)   + LTO thin
-#                                       + gki_defconfig + -march=armv8.4-a
+# Mirrors TNF's own builder (.github/workflows/main.yml on the `builder`
+# branch of topnotchfreaks/kernel_msm-5.15) — the pipeline that actually
+# produces the R9 zips:
 #
-# This workflow builds the pristine zepharo tree at the pinned APEX base with
-# the OFFICIAL recipe: clang r450784e, LTO full (config default), no march
-# override, no -Wno-error. The uploaded AnyKernel3 zip is flashable in
-# recovery — if it boots, our pipeline is validated and the remaining deltas
-# (thin LTO / march override / clang 20) are bisected one at a time.
+#   1. repo init the AOSP kernel manifest (common-android13-5.15-lts) —
+#      this pulls the hermetic toolchain/prebuilts, NOT a bare clang tarball
+#   2. clone the zepharo kernel source into common_<dev>/common
+#   3. pin CLANG_VERSION in build.config.constants (R9-era: r450784e)
+#   4. build via build/build.sh with BUILD_CONFIG=build.config.gki.aarch64
+#   5. package the AnyKernel3 zip (R9-verbatim template)
 #
-# GitHub-hosted runners (free on public repos) have 16GB RAM; LTO full needs
-# ~18G+ free, so we add a 15GB swapfile (same as TNF's workflow).
+# Contrast with our local repro (does NOT boot): clang r547379 (20) +
+# bare-make thin LTO + -march=armv8.4-a. This workflow reproduces the
+# official recipe exactly; if the artifact boots, the remaining deltas
+# are bisected one at a time.
+#
+# Swap note: main.yml uses 15GB; YASK uses 10GB + vm.swappiness=80.
 
 on:
   workflow_dispatch:
     inputs:
       commit:
-        description: 'zepharo commit to build — full 40-char SHA (default: pinned APEX base)'
+        description: 'zepharo commit — full 40-char SHA (empty = branch HEAD)'
         required: false
         default: '7bc9793d909f52f4a6cd45dd1381b2f200c18a7c'
-      clang_archive:
-        description: 'AOSP clang r450784e archive URL'
+      clang_version:
+        description: 'CLANG_VERSION to pin in build.config.constants'
         required: false
-        default: 'https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android14-release/clang-r450784e.tar.gz'
+        default: 'r450784e'
+      lto:
+        description: 'LTO mode (main.yml=thin, YASK=full)'
+        required: false
+        default: 'full'
+        type: choice
+        options: [full, thin]
 
 jobs:
   build:
-    name: r9-exact (clang r450784e, LTO full, no march override)
+    name: r9-exact (build.sh, clang ${{ inputs.clang_version }}, LTO ${{ inputs.lto }})
     runs-on: ubuntu-latest
     timeout-minutes: 240
+    env:
+      kernelDir: common_gki
+      kernelName: common
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup swap 15GB (LTO full needs it)
+      - name: Setup swap 15GB + tune swappiness (TNF recipe)
         uses: pierotofy/set-swap-space@master
         with:
           swap-size-gb: 15
 
-      - name: Install toolchain deps
+      - name: Tune swap
         run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu \
-            binutils-aarch64-linux-gnu ccache zip bc bison flex libssl-dev \
-            libelf-dev aria2
+          echo "vm.swappiness=80" | sudo tee -a /etc/sysctl.conf
+          sudo sysctl -p
 
-      - name: Fetch kernel source (zepharo branch, pinned commit)
+      - name: Install deps
+        run: |
+          mkdir -p "${{ env.kernelDir }}"
+          sudo apt-get update -qq
+          sudo apt-get install -y repo rsync aria2 zip
+
+      - name: Clone kernel source (zepharo, pinned commit)
+        working-directory: ./${{ env.kernelDir }}
         run: |
           git clone --depth 1 --branch zepharo \
-            https://github.com/topnotchfreaks/kernel_msm-5.15 kernel
-          head_sha=$(git -C kernel rev-parse HEAD)
+            https://github.com/topnotchfreaks/kernel_msm-5.15 ${{ env.kernelName }}
+          head_sha=$(git -C ${{ env.kernelName }} rev-parse HEAD)
           echo "branch HEAD: $head_sha"
-          if [ "$head_sha" != "${{ inputs.commit }}" ]; then
+          if [ -n "${{ inputs.commit }}" ] && [ "$head_sha" != "${{ inputs.commit }}" ]; then
             echo "WARNING: zepharo HEAD $head_sha != pinned ${{ inputs.commit }}"
-            git -C kernel fetch --depth 1 origin ${{ inputs.commit }}
-            git -C kernel checkout ${{ inputs.commit }}
+            git -C ${{ env.kernelName }} fetch --depth 1 origin ${{ inputs.commit }}
+            git -C ${{ env.kernelName }} checkout ${{ inputs.commit }}
           fi
-          git -C kernel log --oneline -1
+          git -C ${{ env.kernelName }} log --oneline -1
 
-      - name: Fetch AOSP clang r450784e (the official R9 toolchain)
+      - name: Init AOSP kernel manifest + toolchains
         run: |
-          mkdir -p clang-r450784e
-          aria2c -x 16 -s 16 -o clang.tar.gz "${{ inputs.clang_archive }}"
-          tar -xzf clang.tar.gz -C clang-r450784e
-          rm -f clang.tar.gz
-          echo "$PWD/clang-r450784e/bin" >> "$GITHUB_PATH"
-          clang --version | head -1
+          repo init -u https://android.googlesource.com/kernel/manifest \
+            -b common-android13-5.15-lts --depth=1
+          repo sync --optimized-fetch --prune --no-clone-bundle --no-tags -j"$(nproc)"
 
-      - name: Configure (gki_defconfig — LTO full per config)
-        run: |
-          cd kernel
-          make O=../out ARCH=arm64 CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm \
-            OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip \
-            CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_COMPAT=aarch64-linux-gnu- \
-            gki_defconfig
-          grep -E '^CONFIG_LTO' ../out/.config
+          rm -rf .repo
+          rm -rf common   # don't shadow our clone in common_gki/
 
-      - name: Build kernel (no -march override, no -Wno-error — official recipe)
+          # Drop stale clang prebuilts (TNF does this too)
+          rm -rf prebuilts/clang/host/linux-x86/clang-3289846
+          rm -rf prebuilts/clang/host/linux-x86/clang-stable
+
+          KDIR=${{ env.kernelDir }}/${{ env.kernelName }}
+
+          # Pin the R9-era clang
+          sed -i \
+            -e 's/^BRANCH=.*/BRANCH=android13-5.15/' \
+            -e 's/^CLANG_VERSION=.*/CLANG_VERSION=${{ inputs.clang_version }}/' \
+            "$KDIR/build.config.constants"
+
+          # gki_defconfig, no check_defconfig gate (mirrors main.yml)
+          sed -i '/^DEFCONFIG=gki_defconfig/d' "$KDIR/build.config.gki"
+          sed -i '$a\DEFCONFIG=gki_defconfig' "$KDIR/build.config.gki"
+          sed -i '/^POST_DEFCONFIG_CMDS="check_defconfig"/d' "$KDIR/build.config.gki"
+
+          # Disable KMI strictness (mirrors main.yml)
+          sed -i \
+            -e '/^KMI_SYMBOL_LIST_STRICT_MODE=/d' \
+            -e '/^TRIM_NONLISTED_KMI=/d' \
+            -e '/^KMI_ENFORCED=/d' \
+            -e '$a\KMI_SYMBOL_LIST_STRICT_MODE=0' \
+            -e '$a\TRIM_NONLISTED_KMI=0' \
+            -e '$a\KMI_ENFORCED=0' \
+            -e '/^MODULES_ORDER=/d' \
+            -e '/^MODULES_LIST=/d' \
+            "$KDIR/build.config.gki.aarch64"
+
+      - name: Configure defconfig extras (TNF appends these)
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
-          cd kernel
-          make O=../out ARCH=arm64 CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm \
-            OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip \
-            CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_COMPAT=aarch64-linux-gnu- \
-            -j"$(nproc)"
+          CONFIG_FILE="arch/arm64/configs/gki_defconfig"
+          cat >> "$CONFIG_FILE" << 'EOF'
+          CONFIG_KALLSYMS=y
+          CONFIG_TMPFS_XATTR=y
+          CONFIG_TMPFS_POSIX_ACL=y
+          EOF
+
+      - name: Build kernel (hermetic build.sh — official pipeline)
+        run: |
+          LTO=${{ inputs.lto }} \
+          BUILD_CONFIG=${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64 \
+            build/build.sh -j"$(nproc)"
 
       - name: Verify Image
         run: |
-          ls -la out/arch/arm64/boot/Image
-          strings out/arch/arm64/boot/Image | grep -oE 'Linux version [0-9][^ ]*' | head -1
+          ls -la out/dist/Image
+          strings out/dist/Image | grep -oE 'Linux version [0-9][^ ]*' | head -1
 
       - name: Package AnyKernel3 zip (R9-verbatim template)
         run: |
-          sed 's/VERSION="0.4.0-zepharo"/VERSION="0.4.0-r9-exact"/' tools/package-anykernel3.sh > /tmp/pkg.sh
+          mkdir -p out/arch/arm64/boot
+          cp out/dist/Image out/arch/arm64/boot/Image
+          sed 's/VERSION="0.4.0-zepharo"/VERSION="0.4.0-r9-exact"/' \
+            tools/package-anykernel3.sh > /tmp/pkg.sh
           chmod +x /tmp/pkg.sh
           APEX_NO_MODULES=1 /tmp/pkg.sh
 

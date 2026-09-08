@@ -35,6 +35,10 @@ jobs:
 
       - name: Install toolchain deps
         run: |
+          # vm.swappiness=80 — TNF builder tuning; keeps LTO links off the
+          # OOM cliff on 16GB runners
+          echo "vm.swappiness=80" | sudo tee -a /etc/sysctl.conf
+          sudo sysctl -p
           sudo apt-get update
           sudo apt-get install -y gcc-aarch64-linux-gnu \
             binutils-aarch64-linux-gnu ccache zip bc bison flex libssl-dev \
