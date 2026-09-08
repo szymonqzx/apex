@@ -17,6 +17,13 @@ name: APEX Kernel Matrix Build
 
 on:
   workflow_dispatch:
+    inputs:
+      variant:
+        description: 'Variant to build (single) or all'
+        required: false
+        default: 'full'
+        type: choice
+        options: [full, plain, ksu, susfs, bbg, thermal, all]
   push:
     branches: [main, feat/zepharo-rebase]
     paths: ['defconfig/**', 'patches/**', 'kernel/**', 'tools/build-kernel.sh', 'tools/apply-patches.sh']
@@ -28,8 +35,14 @@ jobs:
     timeout-minutes: 240
     strategy:
       fail-fast: false
+      # Push = full regression gate (all variants). Manual dispatch =
+      # single variant by default — prove the pipeline before fanning out.
       matrix:
-        variant: [plain, ksu, susfs, bbg, thermal, full]
+        variant: ${{ fromJSON(
+          github.event_name == 'workflow_dispatch' &&
+            inputs.variant != 'all' &&
+            format('["{0}"]', inputs.variant) ||
+          '["plain","ksu","susfs","bbg","thermal","full"]' ) }}
     steps:
       - uses: actions/checkout@v4
 
