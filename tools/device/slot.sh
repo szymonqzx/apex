@@ -21,8 +21,11 @@ case "${1:-}" in
   current)
     if dev_present; then
       "$HERE/fastboot-retry.sh" -- getvar current-slot 2>/dev/null | grep -oE "current-slot: [ab]" | awk '{print $2}'
-    else
+    elif timeout 10 "${ADB_BIN:-adb}" devices 2>/dev/null | grep -q "device$"; then
       "$HERE/adb-retry.sh" -- "getprop ro.boot.slot_suffix" | tr -d '_'
+    else
+      echo "no device (fastboot or adb) — cannot determine slot" >&2
+      exit 2
     fi
     ;;
   other)

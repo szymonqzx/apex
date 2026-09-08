@@ -66,6 +66,29 @@ run_once() {
   return 1
 }
 
+usb_reset() {
+  # Bounce the USB 'authorized' attribute for Android/fastboot devices
+  # (idVendor 18d1 or 2717) — forces re-enumeration without a physical
+  # replug. Needed on links that flap: the device enumerates but protocol
+  # is dead ("< waiting for any device >" forever, or writes dying
+  # mid-transfer). Learned on port 1-3 EMI flaps, 2026-09-07/08.
+  local f
+  for f in /sys/bus/usb/devices/*/authorized; do
+    [ -f "$f" ] || continue
+    local d; d=$(dirname "$f")
+    case "$(cat "$d/idVendor" 2>/dev/null)" in
+      18d1|2717)
+        echo "  [fastboot-retry] bouncing USB $d" >&2
+        echo 0 | sudo -n tee "$f" >/dev/null 2>&1 || return 1
+        sleep 2
+        echo 1 | sudo -n tee "$f" >/dev/null 2>&1 || true
+        sleep 3
+        ;;
+    esac
+  done
+  return 0
+}
+
 attempt=0
 while [ "$attempt" -lt "$MAX_TRIES" ]; do
   attempt=$((attempt + 1))
@@ -73,6 +96,7 @@ while [ "$attempt" -lt "$MAX_TRIES" ]; do
   # Ensure the device is actually present before trying.
   if ! timeout 10 "$FASTBOOT_BIN" devices 2>/dev/null | grep -q "fastboot"; then
     echo "  [fastboot-retry] no fastboot device (attempt $attempt/$MAX_TRIES)" >&2
+    [ "$attempt" -ge 2 ] && usb_reset
     sleep "$WAIT"
     continue
   fi
@@ -83,6 +107,9 @@ while [ "$attempt" -lt "$MAX_TRIES" ]; do
 
   if [ "$attempt" -lt "$MAX_TRIES" ]; then
     echo "  [fastboot-retry] retrying in ${WAIT}s (attempt $attempt/$MAX_TRIES)" >&2
+    # A failed transfer on a present-but-half-dead enumeration is the
+    # classic EMI signature — bounce the link before the next attempt.
+    usb_reset
     sleep "$WAIT"
   fi
 done

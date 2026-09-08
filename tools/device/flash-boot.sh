@@ -52,6 +52,23 @@ for S in $TARGETS; do
   case "$S" in a|b) : ;; *) echo "ERROR: invalid slot $S" >&2; exit 64 ;; esac
 done
 
+# --- Ensure fastboot mode: auto-enter from adb if needed, then wait ---
+if ! timeout 10 fastboot devices 2>/dev/null | grep -q "fastboot"; then
+  if timeout 10 adb devices 2>/dev/null | grep -q "device$"; then
+    echo "== device in adb mode — rebooting to bootloader"
+    timeout 15 adb reboot bootloader 2>/dev/null || true
+  fi
+fi
+echo "== waiting for fastboot device"
+fb_wait=0
+while ! timeout 10 fastboot devices 2>/dev/null | grep -q "fastboot"; do
+  fb_wait=$((fb_wait + 5)); sleep 5
+  if [ "$fb_wait" -ge 90 ]; then
+    echo "ERROR: no fastboot device after 90s (check cable/port — USB link flaps)" >&2
+    exit 2
+  fi
+done
+
 # --- Flash each target with retry + post-write verification ---
 for S in $TARGETS; do
   echo "== flashing boot_$S"
