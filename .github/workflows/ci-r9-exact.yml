@@ -136,13 +136,16 @@ jobs:
 
       - name: Verify Image
         run: |
-          ls -la out/dist/Image
-          strings out/dist/Image | grep -oE 'Linux version [0-9][^ ]*' | head -1
+          # build.sh dist goes to out/<BRANCH>/dist (BRANCH=android13-5.15)
+          DIST=$(dirname "$(find out -name Image -path '*/dist/*' | head -1)")
+          echo "dist dir: $DIST"; ls -la "$DIST"/Image*
+          strings "$DIST/Image" | grep -oE 'Linux version [0-9][^ ]*' | head -1
+          echo "DIST_DIR=$DIST" >> "$GITHUB_ENV"
 
       - name: Package AnyKernel3 zip (R9-verbatim template)
         run: |
           mkdir -p out/arch/arm64/boot
-          cp out/dist/Image out/arch/arm64/boot/Image
+          cp "$DIST_DIR/Image" out/arch/arm64/boot/Image
           sed 's/VERSION="0.4.0-zepharo"/VERSION="0.4.0-r9-exact"/' \
             tools/package-anykernel3.sh > /tmp/pkg.sh
           chmod +x /tmp/pkg.sh
