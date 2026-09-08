@@ -259,7 +259,10 @@ if [ "$DRY_RUN" -eq 0 ] && [ "$MODULES_ONLY" -eq 0 ]; then
     dtb_count=$(find "$OUT"/arch/arm64/boot/dts -name "*.dtb" 2>/dev/null | wc -l)
     if [ "$dtb_count" -gt 0 ]; then
       echo "  DTBs: $dtb_count"
-      find "$OUT"/arch/arm64/boot/dts -name "*.dtb" 2>/dev/null | head -5
+      # `|| true`: head -5 closes the pipe early → find gets SIGPIPE (141)
+      # and `set -o pipefail` would otherwise fail the step after a
+      # successful build
+      find "$OUT"/arch/arm64/boot/dts -name "*.dtb" 2>/dev/null | head -5 || true
     else
       echo "  DTBs: none (expected — DTB comes from device/stock kernel)"
     fi
