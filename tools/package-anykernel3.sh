@@ -75,7 +75,7 @@ if [ "$MODULE_COUNT" -gt 0 ]; then
 
   # Use the kernel version from the built Image
   KVER=$(strings "$OUT/arch/arm64/boot/Image" 2>/dev/null |
-    grep -oP 'Linux version \K[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+    grep -oP 'Linux version \K[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)
   if [ -z "$KVER" ]; then
     KVER="5.15.211"
   fi

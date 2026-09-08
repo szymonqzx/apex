@@ -272,7 +272,10 @@ if [ "$DRY_RUN" -eq 0 ] && [ "$MODULES_ONLY" -eq 0 ]; then
     if [ -n "$CCACHE_CMD" ]; then
       echo ""
       echo "  ccache stats:"
-      ccache -s | grep -E '(cache hit|cache miss|files in cache)' | sed 's/^/    /'
+      # `|| true`: ccache 4.x -s output uses different labels ("Hits",
+      # "Misses") — grep can exit 1 and pipefail would fail the step
+      # after a successful build. Informational only.
+      ccache -s | grep -iE '(hit|miss|cache size|files)' | sed 's/^/    /' || true
     fi
     echo ""
     echo "  Next: ./tools/package-anykernel3.sh"
