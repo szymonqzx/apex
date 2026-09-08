@@ -69,10 +69,24 @@ while ! timeout 10 fastboot devices 2>/dev/null | grep -q "fastboot"; do
   fi
 done
 
+# --- Sparsify large images: raw 128MB boot.img transfers wedge on
+# marginal USB links (D-state, mid-write "No such device"). The sparse
+# format skips zero-fill blocks — a 128MB topaz boot carries ~34MB real
+# content and flashed in <5s where raw never survived (2026-09-08).
+FLASH_IMG="$IMG"
+IMG_SIZE=$(stat -c%s "$IMG")
+if [ "$IMG_SIZE" -gt 67108864 ] && command -v img2simg >/dev/null 2>&1; then
+  SPARSE="${IMG%.img}.sparse.img"
+  echo "== sparsifying $(du -h "$IMG" | cut -f1) image → $SPARSE"
+  img2simg "$IMG" "$SPARSE"
+  echo "   sparse size: $(du -h "$SPARSE" | cut -f1)"
+  FLASH_IMG="$SPARSE"
+fi
+
 # --- Flash each target with retry + post-write verification ---
 for S in $TARGETS; do
   echo "== flashing boot_$S"
-  "$HERE/fastboot-retry.sh" --max-tries 6 -- flash "boot_$S" "$IMG" >/dev/null \
+  "$HERE/fastboot-retry.sh" --max-tries 6 -- flash "boot_$S" "$FLASH_IMG" >/dev/null \
     || { echo "ERROR: flash boot_$S failed" >&2; exit 1; }
 
   # Verify the written slot content matches the local image.

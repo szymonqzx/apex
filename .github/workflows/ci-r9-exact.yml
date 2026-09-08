@@ -146,10 +146,10 @@ jobs:
         run: |
           mkdir -p out/arch/arm64/boot
           cp "$DIST_DIR/Image" out/arch/arm64/boot/Image
-          sed 's/VERSION="0.4.0-zepharo"/VERSION="0.4.0-r9-exact"/' \
-            tools/package-anykernel3.sh > /tmp/pkg.sh
-          chmod +x /tmp/pkg.sh
-          APEX_NO_MODULES=1 /tmp/pkg.sh
+          # Run in place — the script resolves paths from its own location;
+          # a copied/sed'd script breaks APEX root resolution.
+          APEX_PKG_VERSION="0.4.0-r9-exact" APEX_NO_MODULES=1 \
+            bash tools/package-anykernel3.sh
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
