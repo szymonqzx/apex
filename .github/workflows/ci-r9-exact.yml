@@ -1,0 +1,108 @@
+name: R9-Exact Reproducible Build
+
+# THE decisive bisection experiment (see docs/CI.md + GBrain
+# apex-device-flash-session-2026-09-08, Round 7-9):
+#
+#   Official TNF R9 (boots on device):  clang r450784e (14.0.7) + LTO full
+#                                       + gki_defconfig + NO -march override
+#   Our R9 repro (does NOT boot):       clang r547379 (20)   + LTO thin
+#                                       + gki_defconfig + -march=armv8.4-a
+#
+# This workflow builds the pristine zepharo tree at the pinned APEX base with
+# the OFFICIAL recipe: clang r450784e, LTO full (config default), no march
+# override, no -Wno-error. The uploaded AnyKernel3 zip is flashable in
+# recovery — if it boots, our pipeline is validated and the remaining deltas
+# (thin LTO / march override / clang 20) are bisected one at a time.
+#
+# GitHub-hosted runners (free on public repos) have 16GB RAM; LTO full needs
+# ~18G+ free, so we add a 15GB swapfile (same as TNF's workflow).
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: 'zepharo commit to build (default: pinned APEX base)'
+        required: false
+        default: '7bc9793d9'
+      clang_archive:
+        description: 'AOSP clang r450784e archive URL'
+        required: false
+        default: 'https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android14-release/clang-r450784e.tar.gz'
+
+jobs:
+  build:
+    name: r9-exact (clang r450784e, LTO full, no march override)
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup swap 15GB (LTO full needs it)
+        uses: pierotofy/set-swap-space@master
+        with:
+          swap-size-gb: 15
+
+      - name: Install toolchain deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu \
+            binutils-aarch64-linux-gnu ccache zip bc bison flex libssl-dev \
+            libelf-dev aria2
+
+      - name: Fetch kernel source (zepharo branch, pinned commit)
+        run: |
+          git clone --depth 1 --branch zepharo \
+            https://github.com/topnotchfreaks/kernel_msm-5.15 kernel
+          head_sha=$(git -C kernel rev-parse HEAD)
+          echo "branch HEAD: $head_sha"
+          if [ "$head_sha" != "${{ inputs.commit }}" ]; then
+            echo "WARNING: zepharo HEAD $head_sha != pinned ${{ inputs.commit }}"
+            git -C kernel fetch --depth 1 origin ${{ inputs.commit }}
+            git -C kernel checkout ${{ inputs.commit }}
+          fi
+          git -C kernel log --oneline -1
+
+      - name: Fetch AOSP clang r450784e (the official R9 toolchain)
+        run: |
+          mkdir -p clang-r450784e
+          aria2c -x 16 -s 16 -o clang.tar.gz "${{ inputs.clang_archive }}"
+          tar -xzf clang.tar.gz -C clang-r450784e
+          rm -f clang.tar.gz
+          echo "$PWD/clang-r450784e/bin" >> "$GITHUB_PATH"
+          clang --version | head -1
+
+      - name: Configure (gki_defconfig — LTO full per config)
+        run: |
+          cd kernel
+          make O=../out ARCH=arm64 CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm \
+            OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip \
+            CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_COMPAT=aarch64-linux-gnu- \
+            gki_defconfig
+          grep -E '^CONFIG_LTO' ../out/.config
+
+      - name: Build kernel (no -march override, no -Wno-error — official recipe)
+        run: |
+          cd kernel
+          make O=../out ARCH=arm64 CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm \
+            OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip \
+            CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_COMPAT=aarch64-linux-gnu- \
+            -j"$(nproc)"
+
+      - name: Verify Image
+        run: |
+          ls -la out/arch/arm64/boot/Image
+          strings out/arch/arm64/boot/Image | grep -oE 'Linux version [0-9][^ ]*' | head -1
+
+      - name: Package AnyKernel3 zip (R9-verbatim template)
+        run: |
+          sed 's/VERSION="0.4.0-zepharo"/VERSION="0.4.0-r9-exact"/' tools/package-anykernel3.sh > /tmp/pkg.sh
+          chmod +x /tmp/pkg.sh
+          APEX_NO_MODULES=1 /tmp/pkg.sh
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: apex-kernel-r9-exact
+          path: |
+            apex-kernel-*.zip
+          retention-days: 30

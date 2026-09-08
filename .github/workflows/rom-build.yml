@@ -1,0 +1,102 @@
+name: APEX ROM Build
+
+# Full LineageOS-based ROM build via docker-lineage-cicd (containerized —
+# see docs/CI.md for requirements and runner setup).
+#
+# IMPORTANT: this job runs on a SELF-HOSTED runner, not GitHub-hosted:
+#   - LOS 18.1+ needs ~300GB storage + 32GB RAM (docker-lineage-cicd docs)
+#   - GitHub-hosted runners guarantee only 14GB (actually 72-145GB, but not
+#     dependable); larger runners (8-core/300GB) are per-minute billed.
+#   - Attach a runner with labels [self-hosted, linux, x64, rom-builder] and
+#     at least ~350GB free, 32GB+ RAM, Docker installed.
+#
+# Inputs:
+#   branch  — LineageOS branch (default lineage-23.2 = Android 16)
+#   device  — device codename (default topaz; tapas also works)
+#   clean   — wipe the source tree before building (true = full re-sync)
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'LineageOS branch'
+        required: false
+        default: 'lineage-23.2'
+      device:
+        description: 'Device codename'
+        required: false
+        default: 'topaz'
+      clean:
+        description: 'Clean source before build (true = full re-sync)'
+        required: false
+        default: 'false'
+        type: boolean
+
+jobs:
+  rom:
+    name: ${{ inputs.device }} @ ${{ inputs.branch }}
+    runs-on: [self-hosted, linux, x64, rom-builder]
+    timeout-minutes: 600
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Preflight — disk, RAM, docker
+        run: |
+          set -e
+          free -g | head -2
+          df -h /srv/apex-rom 2>/dev/null || df -h "$HOME"
+          docker --version
+          avail=$(df --output=avail -B1 "$HOME" 2>/dev/null | tail -1 | tr -d ' ')
+          if [ "$avail" -lt 100000000000 ]; then
+            echo "ERROR: need >= 100GB free (have $((avail/1000000000))GB); LOS needs ~300GB total" >&2
+            exit 1
+          fi
+
+      - name: Pull docker-lineage-cicd image
+        run: docker pull lineageos4microg/docker-lineage-cicd
+
+      - name: Prepare volumes
+        run: |
+          BASE=/srv/apex-rom
+          sudo mkdir -p $BASE/{src,zips,logs,ccache,local_manifests}
+          # APEX local manifests: device tree overrides / APEX overlays
+          sudo cp -r rom-overlays/device/* $BASE/local_manifests/ 2>/dev/null || true
+          ls -la $BASE/local_manifests/
+
+      - name: Build ROM
+        run: |
+          BASE=/srv/apex-rom
+          EXTRA=""
+          if [ "${{ inputs.clean }}" = "true" ]; then
+            sudo rm -rf $BASE/src
+            sudo mkdir -p $BASE/src
+          fi
+          sudo docker run \
+            -e "BRANCH_NAME=${{ inputs.branch }}" \
+            -e "DEVICE_LIST=${{ inputs.device }}" \
+            -e "RELEASE_TYPE=UNOFFICIAL" \
+            -e "CLEAN_OUTDIR=${{ inputs.clean }}" \
+            -v "$BASE/src:/srv/src" \
+            -v "$BASE/zips:/srv/zips" \
+            -v "$BASE/logs:/srv/logs" \
+            -v "$BASE/ccache:/srv/ccache" \
+            -v "$BASE/local_manifests:/srv/local_manifests" \
+            lineageos4microg/docker-lineage-cicd
+
+      - name: Upload built ROM
+        uses: actions/upload-artifact@v4
+        with:
+          name: apex-rom-${{ inputs.device }}-${{ inputs.branch }}
+          path: |
+            /srv/apex-rom/zips/*.zip
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Upload build logs
+        uses: actions/upload-artifact@v4
+        with:
+          name: apex-rom-logs
+          path: |
+            /srv/apex-rom/logs/*.log
+          retention-days: 14
+          if-no-files-found: warn

@@ -40,21 +40,21 @@ jobs:
             binutils-aarch64-linux-gnu ccache zip bc bison flex libssl-dev \
             libelf-dev aria2
 
-      - name: Cache AOSP clang r547379
+      - name: Cache AOSP clang r450784e (the proven R9 toolchain)
         uses: actions/cache@v4
         with:
-          path: clang-r547379
-          key: aosp-clang-r547379
+          path: clang-r450784e
+          key: aosp-clang-r450784e
 
-      - name: Fetch AOSP clang r547379 (skipped when cache hits)
+      - name: Fetch AOSP clang r450784e (skipped when cache hits)
         run: |
-          if [ ! -x clang-r547379/bin/clang ]; then
-            aria2c -x 16 -s 16 -o clang-r547379.tar.gz \
-              "https://github.com/topnotchfreaks/clang/releases/download/v1.0.0/clang-r547379.tar.gz"
-            mkdir -p clang-r547379
-            tar -xzf clang-r547379.tar.gz -C clang-r547379
+          if [ ! -x clang-r450784e/bin/clang ]; then
+            aria2c -x 16 -s 16 -o clang-r450784e.tar.gz \
+              "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android14-release/clang-r450784e.tar.gz"
+            mkdir -p clang-r450784e
+            tar -xzf clang-r450784e.tar.gz -C clang-r450784e
           fi
-          echo "$PWD/clang-r547379/bin" >> "$GITHUB_PATH"
+          echo "$PWD/clang-r450784e/bin" >> "$GITHUB_PATH"
           clang --version | head -1
 
       - name: Cache ccache
