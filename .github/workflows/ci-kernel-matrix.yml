@@ -33,29 +33,31 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install toolchain
+      - name: Install toolchain deps
         run: |
           sudo apt-get update
           sudo apt-get install -y gcc-aarch64-linux-gnu \
             binutils-aarch64-linux-gnu ccache zip bc bison flex libssl-dev \
             libelf-dev aria2
 
-      - name: Cache AOSP clang r450784e (the proven R9 toolchain)
+      # Canonical toolchain is AOSP clang r547379 (clang 20) — see
+      # tools/device/fetch-toolchain.sh and docs/TOOLING.md. r450784e
+      # (clang 14) is only for the ci-r9-exact.yml bisection experiment;
+      # build-kernel.sh rejects clang < 17.
+      - name: Cache AOSP clang r547379 (canonical toolchain)
         uses: actions/cache@v4
         with:
-          path: clang-r450784e
-          key: aosp-clang-r450784e
+          path: apex-toolchain
+          key: aosp-clang-r547379
 
-      - name: Fetch AOSP clang r450784e (skipped when cache hits)
+      - name: Fetch AOSP clang r547379 (skipped when cache hits)
         run: |
-          if [ ! -x clang-r450784e/bin/clang ]; then
-            aria2c -x 16 -s 16 -o clang-r450784e.tar.gz \
-              "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android14-release/clang-r450784e.tar.gz"
-            mkdir -p clang-r450784e
-            tar -xzf clang-r450784e.tar.gz -C clang-r450784e
+          if [ ! -x apex-toolchain/bin/clang ]; then
+            SKIP_MAGISKBOOT=1 bash tools/device/fetch-toolchain.sh \
+              --dir "$PWD/apex-toolchain"
           fi
-          echo "$PWD/clang-r450784e/bin" >> "$GITHUB_PATH"
-          clang --version | head -1
+          echo "APEX_TOOLCHAIN=$PWD/apex-toolchain" >> "$GITHUB_ENV"
+          apex-toolchain/bin/clang --version | head -1
 
       - name: Cache ccache
         uses: actions/cache@v4
