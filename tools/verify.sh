@@ -241,10 +241,11 @@ if [ -n "$LATEST_ZIP" ]; then
   else
     warn "zip contains no .ko modules"
   fi
-  if unzip -l "$LATEST_ZIP" 2>/dev/null | grep -i "zImage" >/dev/null; then
-    ok "zImage in zip"
+  if unzip -l "$LATEST_ZIP" 2>/dev/null | awk '{print $NF}' |
+    grep -qxE 'z?Image(\.(ksu|noksu|gz|lz4))?'; then
+    ok "kernel Image in zip"
   else
-    fail "zImage not in zip"
+    fail "kernel Image not in zip (expected Image, Image.ksu, or zImage)"
   fi
 else
   warn "No flashable zip found (run tools/package-anykernel3.sh)"

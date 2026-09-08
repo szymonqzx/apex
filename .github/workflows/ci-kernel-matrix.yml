@@ -73,8 +73,9 @@ jobs:
           echo "CCACHE_SLOPPINESS=time_macros,pch_defines,include_file_ctime,include_file_mtime" >> "$GITHUB_ENV"
 
       - name: Fetch kernel source
-        run: git clone --depth 1 --branch zepharo \
-              https://github.com/topnotchfreaks/kernel_msm-5.15 kernel
+        run: |
+          git clone --depth 1 --branch zepharo \
+            https://github.com/topnotchfreaks/kernel_msm-5.15 kernel
 
       - name: Apply APEX patches
         run: bash tools/apply-patches.sh

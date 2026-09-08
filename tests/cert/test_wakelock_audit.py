@@ -32,7 +32,7 @@ display_panel 50 100 25 9012345 678 0 40
 sensor_hub_wake 30 60 15 1234567 789 0 25
 """
 
-CLASSIFY_SCRIPT = r"""#!/bin/sh
+CLASSIFY_SCRIPT = r"""#!/bin/bash
 set -uo pipefail
 
 PROTECTED_PATTERNS='qmi

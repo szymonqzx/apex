@@ -21,9 +21,9 @@ on:
   workflow_dispatch:
     inputs:
       commit:
-        description: 'zepharo commit to build (default: pinned APEX base)'
+        description: 'zepharo commit to build — full 40-char SHA (default: pinned APEX base)'
         required: false
-        default: '7bc9793d9'
+        default: '7bc9793d909f52f4a6cd45dd1381b2f200c18a7c'
       clang_archive:
         description: 'AOSP clang r450784e archive URL'
         required: false
