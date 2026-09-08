@@ -264,8 +264,8 @@ jobs:
               echo "ERROR: $aidl missing package declaration"
               exit 1
             fi
-            if ! grep -q 'interface ' "$aidl"; then
-              echo "ERROR: $aidl missing interface declaration"
+            if ! grep -qE '(interface |parcelable )' "$aidl"; then
+              echo "ERROR: $aidl missing interface/parcelable declaration"
               exit 1
             fi
             echo "  OK: $aidl"
@@ -505,7 +505,9 @@ jobs:
       - name: Run ROM build verification
         run: |
           if [ -f tools/verify-rom.sh ]; then
-            bash tools/verify-rom.sh
+            # --structure: APKs/zips are gitignored build artifacts that
+            # cannot exist on a fresh CI checkout
+            bash tools/verify-rom.sh --structure
           else
             echo "ERROR: verify-rom.sh not found"
             exit 1

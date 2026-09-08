@@ -14,17 +14,23 @@
 #   - Brick-safety: no dangerous partition writes
 #   - KSU module zip structure valid
 #
-# Usage: ./verify-rom.sh [--strict]
-#   --strict: warnings become failures (exit 1)
+# Usage: ./verify-rom.sh [--strict] [--structure]
+#   --strict:    warnings become failures (exit 1)
+#   --structure: repo-structure-only mode for fresh checkouts/CI — missing
+#                build artifacts (APKs, packaged zips) are warnings, not
+#                failures (build outputs are gitignored and only exist
+#                after a real build)
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APEX="$(cd "$HERE/.." && pwd)"
 STRICT=0
+STRUCTURE=0
 
 for arg in "$@"; do
   case "$arg" in
     --strict) STRICT=1 ;;
+    --structure) STRUCTURE=1 ;;
   esac
 done
 
@@ -35,6 +41,8 @@ FAIL=0
 ok()   { echo "  [OK]   $1"; PASS=$((PASS + 1)); }
 warn() { echo "  [WARN] $1"; WARN=$((WARN + 1)); }
 fail() { echo "  [FAIL] $1"; FAIL=$((FAIL + 1)); }
+# Missing build artifacts: warn in --structure mode, fail otherwise.
+artifact() { if [ "$STRUCTURE" -eq 1 ]; then warn "$1"; else fail "$1"; fi; }
 
 echo "=== APEX ROM Build Verification ==="
 echo ""
@@ -51,7 +59,7 @@ for name_path in "system-services:$APK_SYSTEM" "ApexControl:$APK_CONTROL" "NFCFo
   name="${name_path%%:*}"
   path="${name_path#*:}"
   if [ ! -f "$path" ]; then
-    fail "$name APK not found: $path"
+    artifact "$name APK not found: $path"
     continue
   fi
   size=$(du -h "$path" | cut -f1)
@@ -249,7 +257,7 @@ if [ -f "$KSU_ZIP" ]; then
     fail "KSU module zip corrupt"
   fi
 else
-  fail "KSU module zip not found"
+  artifact "KSU module zip not found"
 fi
 
 if [ -f "$FLASH_ZIP" ]; then
@@ -273,7 +281,7 @@ if [ -f "$FLASH_ZIP" ]; then
     fail "KSU module missing from flashable zip"
   fi
 else
-  fail "Flashable zip not found"
+  artifact "Flashable zip not found"
 fi
 
 # ── 9. Brick-Safety ───────────────────────────────────────────────
